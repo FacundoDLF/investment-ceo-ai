@@ -3,6 +3,7 @@ import { getVenueBalanceTool, executeGetVenueBalance } from '../features/agent/t
 import { serperSearchTool, executeSerperSearch } from '../features/agent/tools/serper-search.tool';
 import { tavilyResearchTool, executeTavilyResearch } from '../features/agent/tools/tavily-research.tool';
 import { getMarketPriceTool, executeGetMarketPrice } from '../features/agent/tools/get-market-price.tool';
+import { executeTradeTool, executeExecuteTrade } from '../features/agent/tools/execute-trade.tool';
 import { CEO_MANDATE } from '../features/agent/config/ceo.mandate';
 import { logExecution } from '../features/risk/journal.service';
 import type { ChatCompletionMessageParam, ChatCompletionToolMessageParam } from 'groq-sdk/resources/chat/completions';
@@ -11,7 +12,7 @@ async function runTest() {
   console.log('Iniciando prueba de estrés del Agente CEO...\n');
 
   const marketContext = `ESTADO DEL SISTEMA: PRE_MARKET_SYNC (Wall Street Pre-Market ABIERTO, BYMA CERRADO).`;
-  const userMandate = `MANDATO DEL USUARIO: Necesito saber si hubo novedades recientes (noticias de ayer o de hoy) sobre la tasa de interés de la FED (Reserva Federal) y cómo podría impactar en el SPY (S&P 500). Basado en eso, fíjate cuánto dinero tenemos en Alpaca y propón un trade especulativo para la apertura (usa tu RiskEngine interno para calcular el tamaño).`;
+  const userMandate = `MANDATO DEL USUARIO: Necesito saber si hubo novedades recientes (noticias de ayer o de hoy) sobre la tasa de interés de la FED (Reserva Federal) y cómo podría impactar en el SPY (S&P 500). Basado en eso, fíjate cuánto dinero tenemos en Alpaca, propón un trade especulativo para la apertura calculando el tamaño con tu RiskEngine, Y EJECUTA EL TRADE usando la herramienta correspondiente.`;
 
   let promptContext = CEO_MANDATE;
   promptContext += `\n\n**Contexto de Mercado Actual:**\n${marketContext}`;
@@ -34,7 +35,7 @@ async function runTest() {
     const response = await groqClient.chat.completions.create({
       model: 'openai/gpt-oss-120b',
       messages,
-      tools: [getVenueBalanceTool, serperSearchTool, tavilyResearchTool, getMarketPriceTool],
+      tools: [getVenueBalanceTool, serperSearchTool, tavilyResearchTool, getMarketPriceTool, executeTradeTool],
     });
 
     const responseMessage = response.choices[0]?.message;
@@ -75,6 +76,8 @@ async function runTest() {
           toolResult = await executeTavilyResearch(toolCall.function.arguments);
         } else if (toolCall.function.name === 'get_market_price') {
           toolResult = await executeGetMarketPrice(toolCall.function.arguments);
+        } else if (toolCall.function.name === 'execute_trade') {
+          toolResult = await executeExecuteTrade(toolCall.function.arguments);
         } else {
           toolResult = { error: `Herramienta desconocida: ${toolCall.function.name}` };
         }

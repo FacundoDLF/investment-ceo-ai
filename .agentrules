@@ -1,0 +1,21 @@
+# 🤖 Reglas Core del Proyecto: Agente Financiero Autónomo
+
+---
+
+1. **ASDD (Agentic Spec Driven Development)**
+   El desarrollo está guiado por las especificaciones de los agentes. Cada capacidad (Skill/Tool) y comportamiento del agente debe tener su contrato, esquema y prompt claramente definido antes de la implementación lógica.
+
+2. **FSD (Feature-Sliced Design)**
+   Respeta estrictamente la jerarquía: `app > processes > pages > widgets > features > entities > shared`.
+
+3. **SDD (Schema Driven Development)**
+   Toda entrada y salida de datos, especialmente las respuestas de los LLMs, debe estar tipada y validada primero con Zod.
+
+4. **SSOT (Single Source of Truth)**
+   La Base de Datos (Prisma) es la única fuente de verdad. El agente no persiste memoria a largo plazo en su contexto.
+
+5. **Estilo**
+   TypeScript estricto. Código y variables en inglés. `camelCase` para variables/funciones, `PascalCase` para interfaces/modelos.
+
+6. **Tokens**
+   Minimiza el contexto. Envía solo la data estrictamente necesaria a las funciones MCP.

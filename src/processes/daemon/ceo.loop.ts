@@ -100,7 +100,7 @@ async function runDaemonIteration() {
   }
 }
 
-export async function startCeoDaemon(intervalMinutes = 5) {
+export async function startCeoDaemon(intervalMinutes = 1) {
   console.log(`Arrancando CEO Daemon (Intervalo: ${intervalMinutes} minutos)...`);
   
   while (true) {
@@ -111,5 +111,5 @@ export async function startCeoDaemon(intervalMinutes = 5) {
 }
 
 if (require.main === module) {
-  startCeoDaemon(5).catch(console.error);
+  startCeoDaemon(1).catch(console.error);
 }

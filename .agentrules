@@ -19,3 +19,12 @@
 
 6. **Tokens**
    Minimiza el contexto. Envía solo la data estrictamente necesaria a las funciones MCP.
+
+7. **DRY (Don't Repeat Yourself)**
+   Cada lógica, regla de negocio o estructura de datos debe tener una única fuente de verdad en el código. Está estrictamente prohibido duplicar bloques de lógica funcional. Si encuentras código repetido, extráelo y reutilízalo.
+
+8. **KISS (Keep It Simple, Stupid)**
+   Prioriza siempre la legibilidad y la simplicidad por sobre la sobreingeniería o abstracciones innecesarias. El código debe ser fácil de entender para cualquier desarrollador. Evita patrones complejos si una solución simple resuelve el problema.
+
+9. **YAGNI (You Aren't Gonna Need It)**
+   No implementes código, servicios ni estructuras para casos de uso hipotéticos futuros que el proyecto no demande en su estado actual. Construye solo lo que es estrictamente necesario para cumplir los requerimientos presentes.

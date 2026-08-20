@@ -6,7 +6,29 @@ export class AlpacaAdapter implements IVenueAdapter {
   }
 
   async getAvailableBalance(): Promise<number> {
-    throw new Error('Not implemented yet');
+    const apiKey = process.env.ALPACA_API_KEY_ID;
+    const secretKey = process.env.ALPACA_API_SECRET_KEY;
+    const baseUrl = process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2';
+
+    if (!apiKey || !secretKey) {
+      throw new Error('Alpaca API credentials missing in environment variables');
+    }
+
+    const response = await fetch(`${baseUrl}/account`, {
+      headers: {
+        'APCA-API-KEY-ID': apiKey,
+        'APCA-API-SECRET-KEY': secretKey,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Alpaca HTTP Error Response:', { status: response.status, statusText: response.statusText, body: errorText });
+      throw new Error(`Alpaca API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return parseFloat(data.cash);
   }
 
   async executeTrade(symbol: string, amount: number, side: 'BUY' | 'SELL'): Promise<string> {

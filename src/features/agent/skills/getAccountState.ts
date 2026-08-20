@@ -1,10 +1,16 @@
-import { z } from 'zod';
 import { prisma } from '@/shared/lib/prisma';
+import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 
-export const getAccountStateTool = {
-  name: 'get_account_state',
-  description: 'Obtiene el saldo actual de la cuenta, el capital disponible y los desafíos/objetivos activos.',
-  parameters: z.object({}),
+export const getAccountStateTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'get_account_state',
+    description: 'Obtiene el saldo actual de la cuenta, el capital disponible y los desafíos/objetivos activos.',
+    parameters: {
+      type: 'object',
+      properties: {},
+    },
+  },
 };
 
 export async function executeGetAccountState() {

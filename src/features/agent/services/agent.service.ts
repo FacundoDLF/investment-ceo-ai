@@ -1,4 +1,4 @@
-import { groqClient } from '@/shared/lib/groq';
+import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { getAccountStateTool, executeGetAccountState } from '@/features/agent/skills/getAccountState';
 import { executeTradeTool, executeExecuteTrade } from '@/features/agent/tools/execute-trade.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
@@ -18,7 +18,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     messages.push({ role: 'user', content: userMessage });
   }
 
-  const response = await groqClient.chat.completions.create({
+  const response = await createChatCompletionWithRetry({
     model: 'openai/gpt-oss-120b',
     messages,
     tools: [getAccountStateTool, executeTradeTool],

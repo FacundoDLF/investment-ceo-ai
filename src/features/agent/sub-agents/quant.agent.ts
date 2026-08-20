@@ -1,4 +1,4 @@
-import { groqClient } from '@/shared/lib/groq';
+import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/tools/get-venue-balance.tool';
 import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
 import { RiskEngine } from '@/features/risk/risk.engine';
@@ -41,7 +41,7 @@ export async function runQuantAgent(asset: string): Promise<string> {
     calculateRiskSizeTool
   ];
 
-  let response = await groqClient.chat.completions.create({
+  let response = await createChatCompletionWithRetry({
     model: 'openai/gpt-oss-120b',
     messages,
     tools,
@@ -82,7 +82,7 @@ export async function runQuantAgent(asset: string): Promise<string> {
       });
     }
 
-    response = await groqClient.chat.completions.create({
+    response = await createChatCompletionWithRetry({
       model: 'openai/gpt-oss-120b',
       messages,
       tools,

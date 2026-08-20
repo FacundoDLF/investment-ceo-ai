@@ -1,4 +1,4 @@
-import { groqClient } from '@/shared/lib/groq';
+import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { serperSearchTool, executeSerperSearch } from '@/features/agent/tools/serper-search.tool';
 import { tavilyResearchTool, executeTavilyResearch } from '@/features/agent/tools/tavily-research.tool';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
@@ -17,7 +17,7 @@ export async function runResearchAgent(query: string): Promise<string> {
 
   console.log('[Research Agent] Iniciando investigación sobre:', query);
 
-  let response = await groqClient.chat.completions.create({
+  let response = await createChatCompletionWithRetry({
     model: 'openai/gpt-oss-120b',
     messages,
     tools: [serperSearchTool, tavilyResearchTool],
@@ -54,7 +54,7 @@ export async function runResearchAgent(query: string): Promise<string> {
       });
     }
 
-    response = await groqClient.chat.completions.create({
+    response = await createChatCompletionWithRetry({
       model: 'openai/gpt-oss-120b',
       messages,
       tools: [serperSearchTool, tavilyResearchTool],

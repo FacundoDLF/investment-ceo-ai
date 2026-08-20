@@ -1,4 +1,4 @@
-import { groqClient } from '../shared/lib/groq';
+import { createChatCompletionWithRetry } from '../shared/lib/groq';
 import { getVenueBalanceTool, executeGetVenueBalance } from '../features/agent/tools/get-venue-balance.tool';
 import { serperSearchTool, executeSerperSearch } from '../features/agent/tools/serper-search.tool';
 import { tavilyResearchTool, executeTavilyResearch } from '../features/agent/tools/tavily-research.tool';
@@ -32,7 +32,7 @@ async function runTest() {
     console.log(`\n--- Iteración ${iteration} ---`);
     console.log('Enviando petición a Groq...');
 
-    const response = await groqClient.chat.completions.create({
+    const response = await createChatCompletionWithRetry({
       model: 'openai/gpt-oss-120b',
       messages,
       tools: [getVenueBalanceTool, serperSearchTool, tavilyResearchTool, getMarketPriceTool, executeTradeTool],

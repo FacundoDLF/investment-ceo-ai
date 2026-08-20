@@ -28,3 +28,6 @@
 
 9. **YAGNI (You Aren't Gonna Need It)**
    No implementes código, servicios ni estructuras para casos de uso hipotéticos futuros que el proyecto no demande en su estado actual. Construye solo lo que es estrictamente necesario para cumplir los requerimientos presentes.
+
+10. **Enterprise Grade Standard**
+    Calidad y optimización sobre velocidad. Cero tolerancia a anti-patrones. Prohibido mezclar lógica de test con producción. Prohibidos los comentarios obvios o generados por IA; el código debe explicarse por sí mismo (Clean Code).

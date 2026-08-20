@@ -31,9 +31,9 @@ export async function executeGetVenueBalance(argsStr: string) {
   const parsed = JSON.parse(argsStr);
   const args = GetVenueBalanceSchema.parse(parsed);
 
-  const balance = await getUnifiedBalance(args.venue);
+  const balanceBreakdown = await getUnifiedBalance(args.venue);
   return {
     venue: args.venue,
-    availableBalance: balance
+    ...balanceBreakdown
   };
 }

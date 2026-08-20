@@ -1,3 +1,10 @@
+export interface BalanceBreakdown {
+  cash: number;
+  dayTradingPower: number;
+  overnightPower: number;
+  marginMultiplier: number;
+}
+
 /**
  * Interfaz base para los adaptadores de brokers (Venues).
  * NOTA CRÍTICA DE SEGURIDAD: Esta interfaz garantiza un cortafuegos unidireccional (Cash-out only).
@@ -12,9 +19,16 @@ export interface IVenueAdapter {
 
   /**
    * Obtiene el balance disponible para operar o retirar.
-   * @returns El balance disponible.
+   * @returns El balance disponible con desglose de margen.
    */
-  getAvailableBalance(): Promise<number>;
+  getAvailableBalance(): Promise<BalanceBreakdown>;
+
+  /**
+   * Obtiene el precio actual (Bid/Ask) del mercado para un instrumento.
+   * @param symbol Símbolo del activo (ej. 'AAPL', 'BTCUSDT').
+   * @returns Bid y Ask actuales.
+   */
+  getMarketPrice(symbol: string): Promise<{ bid: number; ask: number }>;
 
   /**
    * Ejecuta una orden de compra o venta en el broker.

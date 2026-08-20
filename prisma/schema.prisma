@@ -28,3 +28,30 @@ model Challenge {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model MarketInsight {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  context       String   // e.g. "Impacto por captura geopolítica = Riesgo ALTO"
+  severity      String   // HIGH, MEDIUM, LOW
+  deducedAction String   // e.g. "Hedge positions with USD", "Reduce leverage"
+  marketTarget  String   // e.g. "WALL_STREET", "BYMA", "GLOBAL"
+}
+
+model CeoMemory {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   // Store JSON stringified or raw string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ExecutionLog {
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  eventType String   // e.g. "PRICE_CHECK", "TRADE_ORDER", "MARKET_RESEARCH"
+  venue     String?  // e.g. "alpaca", "bybit"
+  symbol    String?  // e.g. "AAPL", "BTCUSDT"
+  details   String   // JSON stringified details
+  success   Boolean  @default(true)
+}

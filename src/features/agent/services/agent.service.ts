@@ -4,6 +4,7 @@ import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/to
 import { serperSearchTool, executeSerperSearch } from '@/features/agent/tools/serper-search.tool';
 import { tavilyResearchTool, executeTavilyResearch } from '@/features/agent/tools/tavily-research.tool';
 import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
+import { executeTradeTool, executeExecuteTrade } from '@/features/agent/tools/execute-trade.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
@@ -24,7 +25,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
   const response = await groqClient.chat.completions.create({
     model: 'openai/gpt-oss-120b',
     messages,
-    tools: [getAccountStateTool, getVenueBalanceTool, serperSearchTool, tavilyResearchTool, getMarketPriceTool],
+    tools: [getAccountStateTool, getVenueBalanceTool, serperSearchTool, tavilyResearchTool, getMarketPriceTool, executeTradeTool],
   });
 
   const responseMessage = response.choices[0]?.message;
@@ -54,6 +55,11 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       if (toolCall.function.name === 'get_market_price') {
         const result = await executeGetMarketPrice(toolCall.function.arguments);
         console.log('Resultado de get_market_price:', result);
+        return result;
+      }
+      if (toolCall.function.name === 'execute_trade') {
+        const result = await executeExecuteTrade(toolCall.function.arguments);
+        console.log('Resultado de execute_trade:', result);
         return result;
       }
     }

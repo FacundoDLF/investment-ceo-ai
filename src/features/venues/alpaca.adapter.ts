@@ -1,4 +1,4 @@
-import { IVenueAdapter, BalanceBreakdown } from '../../shared/interfaces/venue.adapter';
+import { IVenueAdapter, BalanceBreakdown, OrderParams } from '../../shared/interfaces/venue.adapter';
 
 export class AlpacaAdapter implements IVenueAdapter {
   async getCapabilities(): Promise<string[]> {
@@ -36,8 +36,60 @@ export class AlpacaAdapter implements IVenueAdapter {
     };
   }
 
-  async executeTrade(symbol: string, amount: number, side: 'BUY' | 'SELL'): Promise<string> {
-    throw new Error('Not implemented yet');
+  async executeOrder(params: OrderParams): Promise<any> {
+    const apiKey = process.env.ALPACA_API_KEY_ID;
+    const secretKey = process.env.ALPACA_API_SECRET_KEY;
+    const baseUrl = process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2';
+
+    if (!apiKey || !secretKey) {
+      throw new Error('Alpaca API credentials missing in environment variables');
+    }
+
+    const payload: any = {
+      symbol: params.symbol,
+      qty: params.qty,
+      side: params.side,
+      type: params.type,
+      time_in_force: 'gtc'
+    };
+
+    if (params.type === 'limit' && params.limitPrice) {
+      payload.limit_price = params.limitPrice;
+    }
+
+    if (params.stopLoss || params.takeProfit) {
+      payload.order_class = 'bracket';
+      
+      if (params.takeProfit) {
+        payload.take_profit = {
+          limit_price: params.takeProfit
+        };
+      }
+      
+      if (params.stopLoss) {
+        payload.stop_loss = {
+          stop_price: params.stopLoss,
+        };
+      }
+    }
+
+    const response = await fetch(`${baseUrl}/orders`, {
+      method: 'POST',
+      headers: {
+        'APCA-API-KEY-ID': apiKey,
+        'APCA-API-SECRET-KEY': secretKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Alpaca Order HTTP Error Response:', { status: response.status, statusText: response.statusText, body: errorText });
+      throw new Error(`Alpaca Order API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return await response.json();
   }
 
   async getMarketPrice(symbol: string): Promise<{ bid: number; ask: number }> {

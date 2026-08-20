@@ -1,4 +1,4 @@
-import { IVenueAdapter, BalanceBreakdown } from '../../shared/interfaces/venue.adapter';
+import { IVenueAdapter, BalanceBreakdown, OrderParams } from '../../shared/interfaces/venue.adapter';
 
 export class BybitAdapter implements IVenueAdapter {
   async getCapabilities(): Promise<string[]> {
@@ -9,7 +9,7 @@ export class BybitAdapter implements IVenueAdapter {
     throw new Error('Not implemented yet');
   }
 
-  async executeTrade(symbol: string, amount: number, side: 'BUY' | 'SELL'): Promise<string> {
+  async executeOrder(params: OrderParams): Promise<any> {
     throw new Error('Not implemented yet');
   }
 

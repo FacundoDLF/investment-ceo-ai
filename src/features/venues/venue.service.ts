@@ -1,6 +1,6 @@
 import { AlpacaAdapter } from './alpaca.adapter';
 import { BybitAdapter } from './bybit.adapter';
-import type { IVenueAdapter, BalanceBreakdown } from '../../shared/interfaces/venue.adapter';
+import type { IVenueAdapter, BalanceBreakdown, OrderParams } from '../../shared/interfaces/venue.adapter';
 
 export type VenueName = 'alpaca' | 'bybit';
 
@@ -27,4 +27,14 @@ export async function getMarketPrice(venueName: VenueName, symbol: string): Prom
   }
   
   return await adapter.getMarketPrice(symbol);
+}
+
+export async function executeOrder(venueName: VenueName, params: OrderParams): Promise<any> {
+  const adapter = venueRegistry[venueName];
+  
+  if (!adapter) {
+    throw new Error(`Venue no soportado: ${venueName}`);
+  }
+  
+  return await adapter.executeOrder(params);
 }

@@ -5,6 +5,16 @@ export interface BalanceBreakdown {
   marginMultiplier: number;
 }
 
+export interface OrderParams {
+  symbol: string;
+  side: 'buy' | 'sell';
+  qty: number;
+  type: 'market' | 'limit';
+  limitPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+}
+
 /**
  * Interfaz base para los adaptadores de brokers (Venues).
  * NOTA CRÍTICA DE SEGURIDAD: Esta interfaz garantiza un cortafuegos unidireccional (Cash-out only).
@@ -32,12 +42,10 @@ export interface IVenueAdapter {
 
   /**
    * Ejecuta una orden de compra o venta en el broker.
-   * @param symbol Símbolo del activo (ej. 'AAPL', 'BTCUSDT').
-   * @param amount Cantidad a operar.
-   * @param side 'BUY' para compra, 'SELL' para venta.
+   * @param params Parámetros de la orden.
    * @returns El ID de la transacción u orden.
    */
-  executeTrade(symbol: string, amount: number, side: 'BUY' | 'SELL'): Promise<string>;
+  executeOrder(params: OrderParams): Promise<any>;
 
   /**
    * Ejecuta un retiro de fondos hacia una cuenta externa segura.

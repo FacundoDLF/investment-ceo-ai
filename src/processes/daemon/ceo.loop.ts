@@ -1,9 +1,9 @@
 import { DateTime } from 'luxon';
-import { PrismaClient } from '../../generated/prisma';
 import { runAgentCycle } from '@/features/agent/services/agent.service';
 import { MARKET_STATES } from '@/features/agent/config/ceo.mandate';
-
-const prisma = new PrismaClient();
+import { runResearchAgent } from '@/features/agent/sub-agents/research.agent';
+import { runQuantAgent } from '@/features/agent/sub-agents/quant.agent';
+import { prisma } from '@/shared/lib/prisma';
 
 function getMarketStatus() {
   const now = DateTime.now();
@@ -69,13 +69,27 @@ async function runDaemonIteration() {
       }
     }
 
+    console.log('[CEO Daemon] Consultando a Sub-Agentes en paralelo...');
+    
+    // Ejecutar sub-agentes en paralelo
+    const [researchReport, quantReport] = await Promise.all([
+      runResearchAgent('Resumen macroeconómico y eventos clave del día.'),
+      runQuantAgent('SPY') // Por defecto analizamos un activo de referencia o el portafolio
+    ]);
+
+    console.log('[CEO Daemon] Reportes de Sub-Agentes recibidos.');
+    
+    // Inyectar reportes al contexto del CEO
+    marketContext += `\n\n**Reporte del Research Agent:**\n${researchReport}`;
+    marketContext += `\n\n**Reporte del Quant Agent:**\n${quantReport}`;
+
     const agentResponse = await runAgentCycle(
-      'Analiza el estado del mercado actual y ejecuta operaciones si es necesario.',
+      'Analiza los reportes de tus sub-agentes, el estado del mercado actual y ejecuta operaciones si es necesario basado en tus conclusiones.',
       marketContext
     );
 
     console.log('[Agente CEO] Respuesta obtenida:');
-    if (agentResponse?.content) {
+    if (agentResponse && typeof agentResponse === 'object' && 'content' in agentResponse) {
        console.log(agentResponse.content);
     } else {
        console.log(agentResponse);

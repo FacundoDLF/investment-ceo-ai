@@ -1,11 +1,12 @@
 import { prisma } from '@/shared/lib/prisma';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
+import { getUnifiedBalance } from '@/features/venues/venue.service';
 
 export const getAccountStateTool: ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'get_account_state',
-    description: 'Obtiene el saldo actual de la cuenta, el capital disponible y los desafíos/objetivos activos.',
+    description: 'Obtiene el saldo actual de la cuenta consolidado desde los brokers (Venues), el capital disponible y los desafíos/objetivos activos.',
     parameters: {
       type: 'object',
       properties: {},
@@ -14,11 +15,14 @@ export const getAccountStateTool: ChatCompletionTool = {
 };
 
 export async function executeGetAccountState() {
-  const [account, challenges] = await Promise.all([
-    prisma.account.findFirst({
-      select: {
-        balance: true,
-      },
+  const [alpacaBalance, bybitBalance, challenges] = await Promise.all([
+    getUnifiedBalance('alpaca').catch((e) => {
+      console.warn('Error obteniendo balance de Alpaca:', e.message);
+      return null;
+    }),
+    getUnifiedBalance('bybit').catch((e) => {
+      console.warn('Error obteniendo balance de Bybit:', e.message);
+      return null;
     }),
     prisma.challenge.findMany({
       where: {
@@ -31,8 +35,14 @@ export async function executeGetAccountState() {
     }),
   ]);
 
+  const totalCash = (alpacaBalance?.cash ?? 0) + (bybitBalance?.cash ?? 0);
+
   return {
-    balance: account?.balance ?? 0,
-    challenges, // Ya está filtrado solo con title y targetMetric gracias a Prisma select
+    consolidatedBalance: {
+      totalCash,
+      alpaca: alpacaBalance,
+      bybit: bybitBalance,
+    },
+    challenges,
   };
 }

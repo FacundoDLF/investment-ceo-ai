@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { getMarketPrice, VenueName } from '../../venues/venue.service';
 
-export const getMarketPriceTool = {
-  type: 'function' as const,
+import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
+
+export const getMarketPriceTool: ChatCompletionTool = {
+  type: 'function',
   function: {
     name: 'get_market_price',
     description: 'Fetches real-time Bid and Ask prices directly from the broker (Venue) for a specific symbol. THIS IS THE ONLY SOURCE OF TRUTH FOR PRICES.',

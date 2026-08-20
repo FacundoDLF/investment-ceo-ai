@@ -1,9 +1,5 @@
 import { groqClient } from '@/shared/lib/groq';
 import { getAccountStateTool, executeGetAccountState } from '@/features/agent/skills/getAccountState';
-import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/tools/get-venue-balance.tool';
-import { serperSearchTool, executeSerperSearch } from '@/features/agent/tools/serper-search.tool';
-import { tavilyResearchTool, executeTavilyResearch } from '@/features/agent/tools/tavily-research.tool';
-import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
 import { executeTradeTool, executeExecuteTrade } from '@/features/agent/tools/execute-trade.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
@@ -11,7 +7,7 @@ import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/complet
 export async function runAgentCycle(userMessage?: string, marketContext?: string) {
   let promptContext = CEO_MANDATE;
   if (marketContext) {
-    promptContext += `\n\n**Contexto de Mercado Actual:**\n${marketContext}`;
+    promptContext += `\n\n**Contexto de Mercado y Sub-Agentes:**\n${marketContext}`;
   }
 
   const messages: ChatCompletionMessageParam[] = [
@@ -25,7 +21,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
   const response = await groqClient.chat.completions.create({
     model: 'openai/gpt-oss-120b',
     messages,
-    tools: [getAccountStateTool, getVenueBalanceTool, serperSearchTool, tavilyResearchTool, getMarketPriceTool, executeTradeTool],
+    tools: [getAccountStateTool, executeTradeTool],
   });
 
   const responseMessage = response.choices[0]?.message;
@@ -35,26 +31,6 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       if (toolCall.function.name === 'get_account_state') {
         const result = await executeGetAccountState();
         console.log('Resultado de get_account_state:', result);
-        return result;
-      }
-      if (toolCall.function.name === 'get_venue_balance') {
-        const result = await executeGetVenueBalance(toolCall.function.arguments);
-        console.log('Resultado de get_venue_balance:', result);
-        return result;
-      }
-      if (toolCall.function.name === 'serper_search') {
-        const result = await executeSerperSearch(toolCall.function.arguments);
-        console.log('Resultado de serper_search:', result);
-        return result;
-      }
-      if (toolCall.function.name === 'tavily_research') {
-        const result = await executeTavilyResearch(toolCall.function.arguments);
-        console.log('Resultado de tavily_research:', result);
-        return result;
-      }
-      if (toolCall.function.name === 'get_market_price') {
-        const result = await executeGetMarketPrice(toolCall.function.arguments);
-        console.log('Resultado de get_market_price:', result);
         return result;
       }
       if (toolCall.function.name === 'execute_trade') {

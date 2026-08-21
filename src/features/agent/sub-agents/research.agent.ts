@@ -15,10 +15,19 @@ export async function runResearchAgent(query: string): Promise<string> {
     { role: 'user', content: query }
   ];
 
-  console.log('[Research Agent] Iniciando investigación sobre:', query);
+  console.log('\x1b[35m[Analista de Noticias]\x1b[0m Iniciando investigación sobre:', query);
 
   let response = await createChatCompletionWithRetry({
-    model: 'openai/gpt-oss-120b',
+    model: 'meta-llama/llama-3.1-8b-instruct',
+    fallbackModels: [
+      'anthropic/claude-3.5-haiku',
+      'openai/gpt-4o-mini',
+      'qwen/qwen-2.5-72b-instruct',
+      'anthropic/claude-3.5-sonnet',
+      'liquid/lfm-2.5-2.6b:free',
+      'nvidia/nemotron-3.5-lightning:free',
+      'dots-studio/dots-3-note-preview:free'
+    ],
     messages,
     tools: [serperSearchTool, tavilyResearchTool],
   });
@@ -27,10 +36,30 @@ export async function runResearchAgent(query: string): Promise<string> {
 
   let iterations = 0;
   while (responseMessage?.tool_calls && iterations < 3) {
-    messages.push(responseMessage);
+    if (responseMessage) {
+      delete (responseMessage as any).refusal;
+      if (responseMessage.tool_calls) {
+        for (const tc of responseMessage.tool_calls) {
+          try {
+            JSON.parse(tc.function.arguments);
+          } catch (e) {
+            try {
+              JSON.parse(tc.function.arguments + '}');
+              tc.function.arguments += '}';
+            } catch (e2) {
+              try {
+                JSON.parse(tc.function.arguments + '"}');
+                tc.function.arguments += '"}';
+              } catch (e3) {}
+            }
+          }
+        }
+      }
+    }
+    messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`[Research Agent] Ejecutando herramienta: ${toolCall.function.name}`);
+      console.log(`\x1b[35m[Analista de Noticias]\x1b[0m Ejecutando herramienta: ${toolCall.function.name}`);
       let toolResult = '';
       
       try {
@@ -44,7 +73,8 @@ export async function runResearchAgent(query: string): Promise<string> {
           toolResult = `Herramienta desconocida: ${toolCall.function.name}`;
         }
       } catch (error: any) {
-        toolResult = `Error ejecutando herramienta: ${error.message}`;
+        console.error('\x1b[31m[Analista de Noticias] Error crítico:\x1b[0m', error.message);
+        throw error;
       }
       
       messages.push({
@@ -55,7 +85,16 @@ export async function runResearchAgent(query: string): Promise<string> {
     }
 
     response = await createChatCompletionWithRetry({
-      model: 'openai/gpt-oss-120b',
+      model: 'meta-llama/llama-3.1-8b-instruct',
+      fallbackModels: [
+        'anthropic/claude-3.5-haiku',
+        'openai/gpt-4o-mini',
+        'qwen/qwen-2.5-72b-instruct',
+        'anthropic/claude-3.5-sonnet',
+        'liquid/lfm-2.5-2.6b:free',
+        'nvidia/nemotron-3.5-lightning:free',
+        'dots-studio/dots-3-note-preview:free'
+      ],
       messages,
       tools: [serperSearchTool, tavilyResearchTool],
     });

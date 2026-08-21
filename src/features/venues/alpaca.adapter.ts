@@ -1,4 +1,4 @@
-import { IVenueAdapter, BalanceBreakdown, OrderParams } from '../../shared/interfaces/venue.adapter';
+import { IVenueAdapter, BalanceBreakdown, OrderParams, Position } from '../../shared/interfaces/venue.adapter';
 
 export class AlpacaAdapter implements IVenueAdapter {
   async getCapabilities(): Promise<string[]> {
@@ -8,7 +8,8 @@ export class AlpacaAdapter implements IVenueAdapter {
   async getAvailableBalance(): Promise<BalanceBreakdown> {
     const apiKey = process.env.ALPACA_API_KEY_ID;
     const secretKey = process.env.ALPACA_API_SECRET_KEY;
-    const baseUrl = process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2';
+    const isPaper = process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined;
+    const baseUrl = isPaper ? 'https://paper-api.alpaca.markets/v2' : (process.env.ALPACA_BASE_URL || 'https://api.alpaca.markets/v2');
 
     if (!apiKey || !secretKey) {
       throw new Error('Alpaca API credentials missing in environment variables');
@@ -30,8 +31,9 @@ export class AlpacaAdapter implements IVenueAdapter {
     const data = await response.json();
     return {
       cash: parseFloat(data.cash || '0'),
-      dayTradingPower: parseFloat(data.daytrading_buying_power || '0'),
-      overnightPower: parseFloat(data.regt_buying_power || '0'),
+      spotPower: parseFloat(data.cash || '0'),
+      dayTradingPower: parseFloat(data.daytrading_buying_power || data.buying_power || '0'),
+      overnightPower: parseFloat(data.regt_buying_power || data.buying_power || '0'),
       marginMultiplier: parseFloat(data.multiplier || '1')
     };
   }
@@ -39,7 +41,8 @@ export class AlpacaAdapter implements IVenueAdapter {
   async executeOrder(params: OrderParams): Promise<any> {
     const apiKey = process.env.ALPACA_API_KEY_ID;
     const secretKey = process.env.ALPACA_API_SECRET_KEY;
-    const baseUrl = process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets/v2';
+    const isPaper = process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined;
+    const baseUrl = isPaper ? 'https://paper-api.alpaca.markets/v2' : (process.env.ALPACA_BASE_URL || 'https://api.alpaca.markets/v2');
 
     if (!apiKey || !secretKey) {
       throw new Error('Alpaca API credentials missing in environment variables');
@@ -129,5 +132,40 @@ export class AlpacaAdapter implements IVenueAdapter {
   async executeCashOut(amount: number, destination: string): Promise<string> {
     console.log(`[Alpaca] Ejecutando cash-out de $${amount} hacia ${destination}`);
     return 'mock_tx_id_alpaca';
+  }
+
+  async getOpenPositions(): Promise<Position[]> {
+    const apiKey = process.env.ALPACA_API_KEY_ID;
+    const secretKey = process.env.ALPACA_API_SECRET_KEY;
+    const isPaper = process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined;
+    const baseUrl = isPaper ? 'https://paper-api.alpaca.markets/v2' : (process.env.ALPACA_BASE_URL || 'https://api.alpaca.markets/v2');
+
+    if (!apiKey || !secretKey) {
+      throw new Error('Alpaca API credentials missing in environment variables');
+    }
+
+    const response = await fetch(`${baseUrl}/positions`, {
+      headers: {
+        'APCA-API-KEY-ID': apiKey,
+        'APCA-API-SECRET-KEY': secretKey,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Alpaca Positions HTTP Error Response:', { status: response.status, statusText: response.statusText, body: errorText });
+      throw new Error(`Alpaca Positions API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.map((pos: any) => ({
+      symbol: pos.symbol,
+      qty: parseFloat(pos.qty),
+      marketValue: parseFloat(pos.market_value),
+      unrealizedPl: parseFloat(pos.unrealized_pl),
+      unrealizedPlPc: parseFloat(pos.unrealized_plpc),
+      currentPrice: parseFloat(pos.current_price),
+      avgEntryPrice: parseFloat(pos.avg_entry_price),
+    }));
   }
 }

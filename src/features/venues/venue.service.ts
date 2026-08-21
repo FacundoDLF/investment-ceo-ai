@@ -1,6 +1,6 @@
 import { AlpacaAdapter } from './alpaca.adapter';
 import { BybitAdapter } from './bybit.adapter';
-import type { IVenueAdapter, BalanceBreakdown, OrderParams } from '../../shared/interfaces/venue.adapter';
+import type { IVenueAdapter, BalanceBreakdown, OrderParams, Position } from '../../shared/interfaces/venue.adapter';
 
 export type VenueName = 'alpaca' | 'bybit';
 
@@ -37,4 +37,14 @@ export async function executeOrder(venueName: VenueName, params: OrderParams): P
   }
   
   return await adapter.executeOrder(params);
+}
+
+export async function getUnifiedPositions(venueName: VenueName): Promise<Position[]> {
+  const adapter = venueRegistry[venueName];
+  
+  if (!adapter) {
+    throw new Error(`Venue no soportado: ${venueName}`);
+  }
+  
+  return await adapter.getOpenPositions();
 }

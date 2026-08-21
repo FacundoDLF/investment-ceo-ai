@@ -10,6 +10,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum StrategyType {
+  LONG_TERM
+  INTRADAY
+}
+
 model Account {
   id        String   @id @default(uuid())
   balance   Float    @default(100.0)
@@ -47,11 +52,23 @@ model CeoMemory {
 }
 
 model ExecutionLog {
-  id        String   @id @default(uuid())
-  timestamp DateTime @default(now())
-  eventType String   // e.g. "PRICE_CHECK", "TRADE_ORDER", "MARKET_RESEARCH"
-  venue     String?  // e.g. "alpaca", "bybit"
-  symbol    String?  // e.g. "AAPL", "BTCUSDT"
-  details   String   // JSON stringified details
-  success   Boolean  @default(true)
+  id        String       @id @default(uuid())
+  timestamp DateTime     @default(now())
+  eventType String       // e.g. "PRICE_CHECK", "TRADE_ORDER", "MARKET_RESEARCH"
+  venue     String?      // e.g. "alpaca", "bybit"
+  symbol    String?      // e.g. "AAPL", "BTCUSDT"
+  details   String       // JSON stringified details
+  strategy  StrategyType @default(LONG_TERM)
+  success   Boolean      @default(true)
+}
+
+model Position {
+  id        String       @id @default(uuid())
+  venue     String       // e.g. "alpaca", "bybit"
+  symbol    String       // e.g. "AAPL", "BTCUSDT"
+  strategy  StrategyType @default(LONG_TERM)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([venue, symbol])
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { executeOrder, VenueName } from '@/features/venues/venue.service';
+import { executeOrder, getUnifiedBalance, getMarketPrice, VenueName } from '@/features/venues/venue.service';
 
 export const executeTradeSchema = z.object({
   venue: z.enum(['alpaca', 'bybit']).describe('Venue donde se ejecutará la orden'),
@@ -7,9 +7,11 @@ export const executeTradeSchema = z.object({
   side: z.enum(['buy', 'sell']).describe('Dirección de la orden'),
   qty: z.number().positive().describe('Cantidad a operar'),
   type: z.enum(['market', 'limit']).describe('Tipo de orden'),
-  limitPrice: z.number().positive().optional().describe('Precio límite (requerido si type es limit)'),
-  stopLoss: z.number().positive().optional().describe('Precio de Stop Loss para orden OCO'),
-  takeProfit: z.number().positive().optional().describe('Precio de Take Profit para orden OCO'),
+  limitPrice: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : Number(val), z.number().positive().optional()).describe('Precio límite (requerido si type es limit)'),
+  stopLoss: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : Number(val), z.number().positive().optional()).describe('Precio de Stop Loss para orden OCO'),
+  takeProfit: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : Number(val), z.number().positive().optional()).describe('Precio de Take Profit para orden OCO'),
+  category: z.enum(['spot', 'linear']).optional().describe('Categoría de mercado (spot o linear/futuros). Por defecto linear.'),
+  strategy: z.enum(['LONG_TERM', 'INTRADAY']).describe('Estrategia de la operación'),
 });
 
 export const executeTradeTool = {
@@ -25,11 +27,13 @@ export const executeTradeTool = {
         side: { type: 'string', enum: ['buy', 'sell'] },
         qty: { type: 'number' },
         type: { type: 'string', enum: ['market', 'limit'] },
-        limitPrice: { type: 'number' },
-        stopLoss: { type: 'number' },
-        takeProfit: { type: 'number' },
+        limitPrice: { type: ['number', 'null', 'string'] },
+        stopLoss: { type: ['number', 'null', 'string'] },
+        takeProfit: { type: ['number', 'null', 'string'] },
+        category: { type: 'string', enum: ['spot', 'linear'] },
+        strategy: { type: 'string', enum: ['LONG_TERM', 'INTRADAY'] },
       },
-      required: ['venue', 'symbol', 'side', 'qty', 'type'],
+      required: ['venue', 'symbol', 'side', 'qty', 'type', 'strategy'],
     },
   },
 };
@@ -39,14 +43,38 @@ export async function executeExecuteTrade(args: string) {
     const parsedArgs = JSON.parse(args);
     const params = executeTradeSchema.parse(parsedArgs);
 
-    // SAFETY SWITCH
+    // PRE-FLIGHT CHECK: Verificar fondos disponibles antes de enviar a Bybit/Alpaca
+    if (params.side === 'buy') {
+      try {
+        const balance = await getUnifiedBalance(params.venue as VenueName);
+        const marketPrice = await getMarketPrice(params.venue as VenueName, params.symbol);
+        const estimatedCost = params.qty * marketPrice.ask; // Estimamos con el precio ask (compra)
+        
+        if (params.category === 'spot') {
+          const availableSpot = balance.spotPower || 0;
+          if (estimatedCost > availableSpot) {
+            return JSON.stringify({ 
+              error: `Pre-Flight Check Falló: Saldo Spot Insuficiente. El costo estimado es ~$${estimatedCost.toFixed(2)}, pero tu Poder Spot (Liquidez de Moneda Cotizada) es de solo $${availableSpot.toFixed(2)}. Considera reducir la cantidad ('qty') o cambiar a la categoría 'linear' (Futuros) para usar tu Poder Futuros.`
+            });
+          }
+        } else {
+          // Si es linear (futuros), verificamos a muy alto nivel. El exchange igual puede frenarlo por max_qty
+          const availableFutures = balance.dayTradingPower || 0;
+          if (estimatedCost > availableFutures * 100) { // Asumiendo apalancamiento alto como extremo
+            return JSON.stringify({
+               error: `Pre-Flight Check Falló: Operación demasiado grande para tu Poder de Futuros. Considera reducir drásticamente el 'qty'.`
+            });
+          }
+        }
+      } catch (e: any) {
+        console.warn('No se pudo verificar el Pre-Flight check, continuando con la orden bajo propio riesgo...', e.message);
+      }
+    }
+
+    // La validación de PAPER_MODE_ONLY ahora se realiza dentro de los adaptadores (alpaca.adapter.ts y bybit.adapter.ts)
+    // ruteando la petición a las URLs y credenciales de Demo/Paper.
     if (process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined) {
-      console.warn(`[SAFETY SWITCH] Ejecución simulada de orden en ${params.venue} para ${params.symbol}. Parámetros:`, params);
-      return JSON.stringify({
-        status: 'SIMULACIÓN EXITOSA',
-        message: 'La orden no fue enviada al broker por el Safety Switch (PAPER_MODE_ONLY=true).',
-        simulatedParams: params
-      });
+      console.info(`[PAPER MODE] Enviando orden de prueba en ${params.venue} para ${params.symbol} al entorno Demo/Paper...`);
     }
 
     const result = await executeOrder(params.venue as VenueName, {
@@ -54,10 +82,41 @@ export async function executeExecuteTrade(args: string) {
       side: params.side,
       qty: params.qty,
       type: params.type,
-      limitPrice: params.limitPrice,
-      stopLoss: params.stopLoss,
-      takeProfit: params.takeProfit,
+      limitPrice: params.limitPrice || undefined,
+      stopLoss: params.stopLoss || undefined,
+      takeProfit: params.takeProfit || undefined,
+      category: params.category || undefined
     });
+
+    // Registrar en ExecutionLog local
+    const { prisma } = require('@/shared/lib/prisma');
+    await prisma.executionLog.create({
+      data: {
+        eventType: 'TRADE_ORDER',
+        venue: params.venue,
+        symbol: params.symbol,
+        details: JSON.stringify(result),
+        strategy: params.strategy,
+        success: true
+      }
+    });
+
+    if (params.side === 'buy') {
+      await prisma.position.upsert({
+        where: {
+          venue_symbol: {
+            venue: params.venue,
+            symbol: params.symbol
+          }
+        },
+        update: { strategy: params.strategy },
+        create: {
+          venue: params.venue,
+          symbol: params.symbol,
+          strategy: params.strategy
+        }
+      });
+    }
 
     return JSON.stringify(result);
   } catch (error: any) {

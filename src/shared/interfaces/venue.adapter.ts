@@ -1,5 +1,6 @@
 export interface BalanceBreakdown {
   cash: number;
+  spotPower?: number;
   dayTradingPower: number;
   overnightPower: number;
   marginMultiplier: number;
@@ -10,9 +11,20 @@ export interface OrderParams {
   side: 'buy' | 'sell';
   qty: number;
   type: 'market' | 'limit';
+  category?: 'spot' | 'linear';
   limitPrice?: number;
   stopLoss?: number;
   takeProfit?: number;
+}
+
+export interface Position {
+  symbol: string;
+  qty: number;
+  marketValue: number;
+  unrealizedPl: number;
+  unrealizedPlPc: number;
+  currentPrice: number;
+  avgEntryPrice: number;
 }
 
 /**
@@ -54,4 +66,10 @@ export interface IVenueAdapter {
    * @returns El ID de la transacción de retiro.
    */
   executeCashOut(amount: number, destination: string): Promise<string>;
+
+  /**
+   * Obtiene las posiciones abiertas actualmente en el broker.
+   * @returns Un array de posiciones.
+   */
+  getOpenPositions(): Promise<Position[]>;
 }

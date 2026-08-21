@@ -4,4 +4,5 @@ export interface OrderProposal {
   expectedWinProbability: number;
   expectedWinLossRatio: number;
   proposedRiskAmount: number;
+  strategy?: 'LONG_TERM' | 'INTRADAY';
 }

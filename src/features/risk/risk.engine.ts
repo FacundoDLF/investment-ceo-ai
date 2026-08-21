@@ -54,13 +54,22 @@ export class RiskEngine {
  * @param currentBalance The current available balance
  * @returns Object indicating if order is valid and the maximum allowed risk
  */
-export function validateOrder(proposal: OrderProposal, currentBalance: number): { 
+export function validateOrder(
+  proposal: OrderProposal, 
+  currentBalance: number,
+  strategy: 'LONG_TERM' | 'INTRADAY' = 'LONG_TERM'
+): { 
   isApproved: boolean; 
   maxAllowedAmount: number; 
   reason?: string 
 } {
+  // Compartimentación de Capital
+  const compartmentalizedBalance = strategy === 'LONG_TERM' 
+    ? currentBalance * 0.70 // 70% Core
+    : currentBalance * 0.30; // 30% Intraday (Satélite)
+
   const maxAllowedAmount = RiskEngine.calculatePositionSize(
-    currentBalance,
+    compartmentalizedBalance,
     proposal.expectedWinProbability,
     proposal.expectedWinLossRatio
   );

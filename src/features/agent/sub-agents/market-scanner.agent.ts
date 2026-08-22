@@ -1,5 +1,5 @@
 export async function runMarketScanner(): Promise<string> {
-  console.log('\x1b[35m[Scanner de Mercado]\x1b[0m Analizando el mercado de Bybit en busca de oportunidades...');
+  console.log('\x1b[35m[Markus Skinner]\x1b[0m Analizando el mercado de Bybit en busca de oportunidades...');
   try {
     const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
     const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
@@ -42,7 +42,7 @@ export async function runMarketScanner(): Promise<string> {
 
     return report;
   } catch (error: any) {
-    console.error('\x1b[35m[Scanner de Mercado]\x1b[0m Error:', error.message);
+    console.error('\x1b[35m[Markus Skinner]\x1b[0m Error:', error.message);
     return `Error en el Market Scanner: ${error.message}`;
   }
 }

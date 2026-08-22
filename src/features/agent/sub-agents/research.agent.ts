@@ -15,7 +15,7 @@ export async function runResearchAgent(query: string): Promise<string> {
     { role: 'user', content: query }
   ];
 
-  console.log('\x1b[35m[Analista de Noticias]\x1b[0m Iniciando investigación sobre:', query);
+  console.log('\x1b[35m[Richard Newman]\x1b[0m Iniciando investigación sobre:', query);
 
   let response = await createChatCompletionWithRetry({
     model: 'meta-llama/llama-3.3-70b-instruct',
@@ -53,7 +53,7 @@ export async function runResearchAgent(query: string): Promise<string> {
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\x1b[35m[Analista de Noticias]\x1b[0m Ejecutando herramienta: ${toolCall.function.name}`);
+      console.log(`\x1b[35m[Richard Newman]\x1b[0m Ejecutando herramienta: ${toolCall.function.name}`);
       let toolResult = '';
       
       try {
@@ -67,7 +67,7 @@ export async function runResearchAgent(query: string): Promise<string> {
           toolResult = `Herramienta desconocida: ${toolCall.function.name}`;
         }
       } catch (error: any) {
-        console.error('\x1b[31m[Analista de Noticias] Error crítico:\x1b[0m', error.message);
+        console.error('\x1b[31m[Richard Newman] Error crítico:\x1b[0m', error.message);
         throw error;
       }
       

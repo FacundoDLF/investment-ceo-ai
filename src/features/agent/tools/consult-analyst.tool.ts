@@ -25,7 +25,7 @@ export async function executeConsultAnalyst(args: string, marketContext: string)
     const parsedArgs = JSON.parse(args);
     const params = consultAnalystSchema.parse(parsedArgs);
 
-    console.log('\x1b[35m[CEO Trader]\x1b[0m Consultando a Claude 3.5 Sonnet (OpenRouter)...');
+    console.log('\x1b[35m[Marta Fan]\x1b[0m Analizando consulta táctica del CEO Trader...');
 
     const promptContext = `Eres el Analista Senior (Smart Agent) del fondo. El CEO rápido (HFT) tiene una duda y necesita tu consejo profundo y analítico.
 Contexto de Mercado:

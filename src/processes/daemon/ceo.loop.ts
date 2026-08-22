@@ -137,23 +137,23 @@ async function runDaemonIteration(mode?: string) {
     // Ejecutar Research Agent cada 1 hora (3600000 ms)
     const now = Date.now();
     if (now - lastResearchTime > 3600000) {
-      console.log('\x1b[33m[Sistema]\x1b[0m Ejecutando Analista de Noticias (Contexto Global)...');
+      console.log('\x1b[33m[Sistema]\x1b[0m Ejecutando a Richard Newman (Analista Macro/Noticias)...');
       cachedResearchReport = await runResearchAgent('Resumen macroeconómico, eventos clave del día y estado general del mercado de criptomonedas.');
       lastResearchTime = now;
 
       // Podríamos guardar el insight en base de datos aquí si lo necesitamos persistente
     } else {
-      console.log('\x1b[33m[Sistema]\x1b[0m Usando caché del Research Agent (Menos de 1h desde la última ejecución).');
+      console.log('\x1b[33m[Sistema]\x1b[0m Usando caché de Richard Newman (Menos de 1h desde la última ejecución).');
     }
 
     // Ejecutar Market Scanner cada 15 minutos (900000 ms)
     if (mode === 'crypto') {
       if (now - lastScannerTime > 900000) {
-        console.log('\x1b[33m[Sistema]\x1b[0m Ejecutando Scanner de Mercado (Oportunidades Bybit)...');
+        console.log('\x1b[33m[Sistema]\x1b[0m Ejecutando a Markus Skinner (Escáner de Mercado)...');
         cachedScannerReport = await runMarketScanner();
         lastScannerTime = now;
       } else {
-        console.log('\x1b[33m[Sistema]\x1b[0m Usando caché del Market Scanner (Menos de 15m desde la última ejecución).');
+        console.log('\x1b[33m[Sistema]\x1b[0m Usando caché de Markus Skinner (Menos de 15m desde la última ejecución).');
       }
     }
 
@@ -162,19 +162,19 @@ async function runDaemonIteration(mode?: string) {
     let quantReport = "No se ejecutó Quant Agent por falta de liquidez (Ahorro de recursos).";
 
     if (hasCapital) {
-      console.log(`\x1b[33m[Sistema]\x1b[0m Iniciando Quant Agent para activo principal (${assetToAnalyze}) buscando variaciones...`);
+      console.log(`\x1b[33m[Sistema]\x1b[0m Despertando a Rick Queen (Quant Agent) para analizar ${assetToAnalyze}...`);
       quantReport = await runQuantAgent(assetToAnalyze, venue);
     } else {
-      console.log(`\x1b[33m[Sistema]\x1b[0m Omitiendo Quant Agent: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
+      console.log(`\x1b[33m[Sistema]\x1b[0m Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
     }
 
     console.log('\x1b[33m[Sistema]\x1b[0m Reportes listos. Entregando al CEO Trader para toma de decisiones...');
 
     // Inyectar reportes al contexto del CEO
-    marketContext += `\n\n**Reporte del Research Agent (Macro/Noticias):**\n${cachedResearchReport}`;
-    marketContext += `\n\n**Reporte del Quant Agent (Precios y Riesgo en Vivo):**\n${quantReport}`;
+    marketContext += `\n\n**Reporte de Richard Newman (Macro/Noticias):**\n${cachedResearchReport}`;
+    marketContext += `\n\n**Reporte de Rick Queen (Precios y Riesgo en Vivo):**\n${quantReport}`;
     if (mode === 'crypto') {
-      marketContext += `\n\n**Reporte del Market Scanner (Oportunidades):**\n${cachedScannerReport}`;
+      marketContext += `\n\n**Reporte de Markus Skinner (Oportunidades):**\n${cachedScannerReport}`;
     }
 
     const agentPrompt = isDamageControl 

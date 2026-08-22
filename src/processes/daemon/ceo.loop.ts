@@ -206,13 +206,25 @@ async function runDaemonIteration(mode?: string) {
       }
     }
 
-    // El quant agent analiza SPY por defecto en modo normal, o el activo actual en modo crypto
-    const assetToAnalyze = mode === TRADING_MODES.CRYPTO ? StateService.getCurrentCryptoAsset() : 'SPY';
+    // El quant agent analiza SPY por defecto en modo normal, o los activos actuales en modo crypto
+    const targetAsset = mode === TRADING_MODES.CRYPTO ? StateService.getCurrentCryptoAsset() : 'SPY';
+    const assetsToAnalyze = new Set<string>();
+    assetsToAnalyze.add(targetAsset);
+
+    if (mode === TRADING_MODES.CRYPTO && balance.coins) {
+      balance.coins.forEach(c => {
+        if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
+          assetsToAnalyze.add(`${c.symbol}USDT`);
+        }
+      });
+    }
+
+    const assetsArray = Array.from(assetsToAnalyze);
     let quantReport = "No se ejecutó Quant Agent por falta de liquidez (Ahorro de recursos).";
 
     if (hasCapital) {
-      console.log(`${LOG_PREFIX.SISTEMA} Despertando a Rick Queen (Quant Agent) para analizar ${assetToAnalyze}...`);
-      quantReport = await runQuantAgent(assetToAnalyze, venue);
+      console.log(`${LOG_PREFIX.SISTEMA} Despertando a Rick Queen (Quant Agent) para analizar ${assetsArray.join(', ')}...`);
+      quantReport = await runQuantAgent(assetsArray, venue);
     } else {
       console.log(`${LOG_PREFIX.SISTEMA} Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
     }

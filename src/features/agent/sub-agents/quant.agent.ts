@@ -30,13 +30,13 @@ const calculateRiskSizeTool: ChatCompletionTool = {
   }
 };
 
-export async function runQuantAgent(asset: string, venue: string): Promise<string> {
+export async function runQuantAgent(assets: string[], venue: string): Promise<string> {
   const messages: ChatCompletionMessageParam[] = [
     { role: 'system', content: QUANT_MANDATE + `\n\nEstás evaluando el mercado en el broker: ${venue}. Usa siempre este venue en tus herramientas.` },
-    { role: 'user', content: `Analiza la viabilidad cuantitativa para el activo: ${asset}` }
+    { role: 'user', content: `Analiza la viabilidad cuantitativa para los siguientes activos: ${assets.join(', ')}` }
   ];
 
-  console.log(`${LOG_PREFIX.RICK_QUEEN} Iniciando análisis cuantitativo para:`, asset);
+  console.log(`${LOG_PREFIX.RICK_QUEEN} Iniciando análisis cuantitativo para:`, assets.join(', '));
 
   const tools: ChatCompletionTool[] = [
     getVenueBalanceTool,

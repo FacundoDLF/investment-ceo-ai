@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-22T20:39:06.833Z",
+  "timestamp": "2026-08-22T21:16:10.827Z",
   "uid": "groq::openai/gpt-oss-20b",
   "model": "openai/gpt-oss-20b",
   "provider": "groq",
   "status": 400,
-  "error": "400 {\"error\":{\"message\":\"'messages.2' : for 'role:assistant' the following must be satisfied[('messages.2' : property 'reasoning_details' is unsupported)]\",\"type\":\"invalid_request_error\"}}"
+  "error": "400 {\"error\":{\"message\":\"Tool call validation failed: tool call validation failed: attempted to call tool 'skalp_action' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"skalp_action\\\", \\\"arguments\\\": {\\\"action\\\":\\\"HOLD\\\"}}\"}}"
 }

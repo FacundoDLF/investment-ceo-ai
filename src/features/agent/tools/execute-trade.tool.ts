@@ -75,10 +75,11 @@ export async function executeExecuteTrade(args: string) {
         const estimatedCost = params.qty * marketPrice.ask; // Estimamos con el precio ask (compra)
         
         if (params.category === 'spot') {
-          const availableSpot = balance.spotPower || 0;
-          if (estimatedCost > availableSpot) {
+          const quoteCoin = params.symbol.endsWith('USDT') ? 'USDT' : params.symbol.endsWith('USDC') ? 'USDC' : 'USDT';
+          const quoteBalance = balance.coins?.find(c => c.symbol === quoteCoin)?.balance || 0;
+          if (estimatedCost > quoteBalance) {
             return JSON.stringify({ 
-              error: `Pre-Flight Check Falló: Saldo Spot Insuficiente. El costo estimado es ~$${estimatedCost.toFixed(2)}, pero tu Poder Spot (Liquidez de Moneda Cotizada) es de solo $${availableSpot.toFixed(2)}. Considera reducir la cantidad ('qty') o cambiar a la categoría 'linear' (Futuros) para usar tu Poder Futuros.`
+              error: `Pre-Flight Check Falló: Saldo Spot Insuficiente. Intentas comprar ~$${estimatedCost.toFixed(2)} de ${params.symbol}, pero solo tienes $${quoteBalance.toFixed(2)} en ${quoteCoin}. Si deseas usar liquidez de Futuros, cambia category a 'linear'.`
             });
           }
         } else {

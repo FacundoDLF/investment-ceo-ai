@@ -7,9 +7,9 @@ export const executeTradeSchema = z.object({
   side: z.enum(['buy', 'sell']).describe('Dirección de la orden'),
   qty: z.number().positive().describe('Cantidad a operar'),
   type: z.enum(['market', 'limit']).describe('Tipo de orden'),
-  limitPrice: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : Number(val), z.number().positive().optional()).describe('Precio límite (requerido si type es limit)'),
-  stopLoss: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : Number(val), z.number().positive().optional()).describe('Precio de Stop Loss para orden OCO'),
-  takeProfit: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : Number(val), z.number().positive().optional()).describe('Precio de Take Profit para orden OCO'),
+  limitPrice: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio límite (requerido si type es limit)'),
+  stopLoss: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio de Stop Loss para orden OCO'),
+  takeProfit: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio de Take Profit para orden OCO'),
   category: z.enum(['spot', 'linear']).optional().describe('Categoría de mercado (spot o linear/futuros). Por defecto linear.'),
   strategy: z.enum(['LONG_TERM', 'INTRADAY']).describe('Estrategia de la operación'),
 });
@@ -41,7 +41,23 @@ export const executeTradeTool = {
 export async function executeExecuteTrade(args: string) {
   try {
     const parsedArgs = JSON.parse(args);
-    const params = executeTradeSchema.parse(parsedArgs);
+    
+    const parsedResult = executeTradeSchema.safeParse(parsedArgs);
+    if (!parsedResult.success) {
+      return JSON.stringify({ error: "Validation Error", details: parsedResult.error.issues });
+    }
+    const params = parsedResult.data;
+
+    // Normalizar qty para Bybit para evitar "Qty invalid"
+    if (params.venue === 'bybit') {
+      if (params.symbol === 'BTCUSDT') {
+        params.qty = Math.floor(params.qty * 1000) / 1000;
+      } else if (params.symbol === 'ETHUSDT') {
+        params.qty = Math.floor(params.qty * 100) / 100;
+      } else {
+        params.qty = Math.floor(params.qty);
+      }
+    }
 
     // PRE-FLIGHT CHECK: Verificar fondos disponibles antes de enviar a Bybit/Alpaca
     if (params.side === 'buy') {

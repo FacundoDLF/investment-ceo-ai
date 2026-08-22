@@ -69,7 +69,7 @@ export class BybitAdapter implements IVenueAdapter {
         const accountInfo = list[0];
 
         const totalEquity = parseFloat(accountInfo.totalEquity || '0');
-        const totalAvailable = parseFloat(accountInfo.totalMarginBalance || accountInfo.totalWalletBalance || '0');
+        const totalAvailable = parseFloat(accountInfo.totalAvailableBalance || accountInfo.totalMarginBalance || accountInfo.totalWalletBalance || '0');
 
         // Calcular el poder de SPOT (generalmente USDT disponible + USDC disponible)
         let spotPower = 0;

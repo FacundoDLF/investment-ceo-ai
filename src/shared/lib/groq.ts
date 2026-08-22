@@ -1,16 +1,20 @@
 import Groq from 'groq-sdk';
 import type { ChatCompletionCreateParamsNonStreaming, ChatCompletion } from 'groq-sdk/resources/chat/completions';
 
-const isOpenRouter = !!process.env.OPENROUTER_API_KEY;
+export const nativeGroqClient = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+  timeout: 45000,
+  maxRetries: 0
+});
+export const groqClient = nativeGroqClient;
 
-export const groqClient = new Groq({
-  apiKey: process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY,
-  baseURL: isOpenRouter ? 'https://openrouter.ai/api/v1' : undefined,
+export const openRouterClient = new Groq({
+  apiKey: process.env.OPENROUTER_API_KEY || 'dummy_key',
+  baseURL: 'https://openrouter.ai/api/v1',
   timeout: 45000,
   maxRetries: 0,
   fetch: async (url, init) => {
-    if (isOpenRouter && typeof url === 'string') {
-      // El SDK de Groq inyecta "/openai/v1" a la fuerza. Lo removemos para que funcione con OpenRouter.
+    if (typeof url === 'string') {
       url = url.replace('/openai/v1/chat/completions', '/chat/completions');
     }
     return fetch(url, init);
@@ -45,7 +49,7 @@ export async function createChatCompletionWithRetry(
       const cooldown = globalModelCooldowns.get(model) || 0;
       if (cooldown <= now) {
         availableModelIndex = i;
-        break; // Encontramos el primero disponible!
+        break;
       } else {
         const waitTime = cooldown - now;
         if (waitTime < minWaitTime) {
@@ -62,16 +66,18 @@ export async function createChatCompletionWithRetry(
       }
 
       attempt++;
-      console.warn(`[LLM API] Todos los modelos en Cooldown. Esperando ${minWaitTime}ms hasta que se libere ${nextModelToFree} (Reintento basado en Header)...`);
+      console.warn(`[LLM API] Todos los modelos en Cooldown. Esperando ${minWaitTime}ms hasta que se libere ${nextModelToFree}...`);
       await new Promise((resolve) => setTimeout(resolve, minWaitTime));
-      continue; // Volvemos a evaluar el loop, el modelo ya debería estar libre
+      continue;
     }
 
     const currentModel = allModels[availableModelIndex];
+    const client = currentModel.includes('/') ? openRouterClient : nativeGroqClient;
+
     try {
       const currentParams = { max_tokens: 500, ...params, model: currentModel };
       delete (currentParams as any).fallbackModels;
-      return await groqClient.chat.completions.create(currentParams as ChatCompletionCreateParamsNonStreaming);
+      return await client.chat.completions.create(currentParams as ChatCompletionCreateParamsNonStreaming);
     } catch (error: any) {
       const isRateLimit = error?.status === 429 || error?.status === 413;
       const isNetworkError = !error?.status || error?.status >= 500 || error?.name === 'APITimeoutError';
@@ -92,13 +98,13 @@ export async function createChatCompletionWithRetry(
           const cleaned = retryAfterRaw.toString().replace(/ms/gi, '').replace(/s/gi, '').trim();
           const parsed = Number(cleaned);
           if (!Number.isNaN(parsed) && parsed > 0) {
-            if (parsed > 1577836800000) { // UNIX timestamp in milliseconds
+            if (parsed > 1577836800000) { 
               const wait = parsed - Date.now();
               waitTimeMs = wait > 0 ? wait : 1000;
-            } else if (parsed > 1577836800) { // UNIX timestamp in seconds
+            } else if (parsed > 1577836800) { 
               const wait = (parsed * 1000) - Date.now();
               waitTimeMs = wait > 0 ? wait : 1000;
-            } else { // Duration in seconds
+            } else { 
               waitTimeMs = parsed * 1000;
             }
           }
@@ -113,25 +119,10 @@ export async function createChatCompletionWithRetry(
           }
         }
 
-        if (waitTimeMs <= 0) {
-          // Si es Rate Limit pero no hay header explícito, escribimos un log post-mortem y abortamos.
-          const fs = require('fs');
-          const path = require('path');
-          const logPath = path.join(process.cwd(), 'error_postmortem.json');
-          fs.writeFileSync(logPath, JSON.stringify({
-            timestamp: new Date().toISOString(),
-            error: error?.message,
-            status: error?.status,
-            headers: error?.headers,
-            metadata: error?.error?.metadata || error?.metadata,
-            model: currentModel
-          }, null, 2));
-          throw new Error(`Fallo por RateLimit/Timeout sin tiempo de espera definido. Log post-mortem guardado en: ${logPath}`);
-        }
+        if (waitTimeMs <= 0) waitTimeMs = 15000;
 
-        // Registrar el cooldown a nivel global para este modelo exacto
         globalModelCooldowns.set(currentModel, Date.now() + waitTimeMs);
-        console.warn(`\x1b[31m[Model Fallback]\x1b[0m RateLimit (429) en ${currentModel}. Cooldown registrado: ${waitTimeMs}ms...`);
+        console.warn(`\x1b[31m[Model Fallback]\x1b[0m RateLimit (429) en ${currentModel}. Cooldown: ${waitTimeMs}ms...`);
         continue;
       } 
       
@@ -146,3 +137,4 @@ export async function createChatCompletionWithRetry(
     }
   }
 }
+

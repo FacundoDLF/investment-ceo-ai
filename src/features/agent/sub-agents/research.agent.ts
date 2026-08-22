@@ -18,15 +18,9 @@ export async function runResearchAgent(query: string): Promise<string> {
   console.log('\x1b[35m[Analista de Noticias]\x1b[0m Iniciando investigación sobre:', query);
 
   let response = await createChatCompletionWithRetry({
-    model: 'meta-llama/llama-3.1-8b-instruct',
+    model: 'meta-llama/llama-3.3-70b-instruct',
     fallbackModels: [
-      'anthropic/claude-3.5-haiku',
-      'openai/gpt-4o-mini',
-      'qwen/qwen-2.5-72b-instruct',
-      'anthropic/claude-3.5-sonnet',
-      'liquid/lfm-2.5-2.6b:free',
-      'nvidia/nemotron-3.5-lightning:free',
-      'dots-studio/dots-3-note-preview:free'
+      'qwen/qwen-2.5-72b-instruct'
     ],
     messages,
     tools: [serperSearchTool, tavilyResearchTool],
@@ -85,15 +79,9 @@ export async function runResearchAgent(query: string): Promise<string> {
     }
 
     response = await createChatCompletionWithRetry({
-      model: 'meta-llama/llama-3.1-8b-instruct',
+      model: 'meta-llama/llama-3.3-70b-instruct',
       fallbackModels: [
-        'anthropic/claude-3.5-haiku',
-        'openai/gpt-4o-mini',
-        'qwen/qwen-2.5-72b-instruct',
-        'anthropic/claude-3.5-sonnet',
-        'liquid/lfm-2.5-2.6b:free',
-        'nvidia/nemotron-3.5-lightning:free',
-        'dots-studio/dots-3-note-preview:free'
+        'qwen/qwen-2.5-72b-instruct'
       ],
       messages,
       tools: [serperSearchTool, tavilyResearchTool],

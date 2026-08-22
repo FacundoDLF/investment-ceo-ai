@@ -131,7 +131,7 @@ async function runDaemonIteration(mode?: string) {
 
     if (hasCapital) {
       console.log(`\x1b[33m[Sistema]\x1b[0m Iniciando Quant Agent para activo principal (${assetToAnalyze}) buscando variaciones...`);
-      quantReport = await runQuantAgent(assetToAnalyze);
+      quantReport = await runQuantAgent(assetToAnalyze, venue);
     } else {
       console.log(`\x1b[33m[Sistema]\x1b[0m Omitiendo Quant Agent: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
     }

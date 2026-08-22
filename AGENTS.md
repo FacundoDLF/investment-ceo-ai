@@ -7,3 +7,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# PROJECT MANDATORY RULES
+
+## 1. PROJECT KNOWLEDGE ACKNOWLEDGMENT
+MANDATORY: Cada vez que inicies un trabajo, respondas a un prompt o propongas algo, DEBES empezar tu primera respuesta indicando explícitamente que has leído y revisado el archivo `PROJECT_KNOWLEDGE.md` y que estás listo para comenzar. NUNCA propongas o modifiques código sin antes cumplir con esta directiva.
+
+**Queda terminantemente PROHIBIDO omitir este archivo y volver a cometer errores que ya hayan sido registrados en la bitácora.**

@@ -2,6 +2,8 @@ import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { getAccountStateTool, executeGetAccountState } from '@/features/agent/skills/getAccountState';
 import { executeTradeTool, executeExecuteTrade } from '@/features/agent/tools/execute-trade.tool';
 import { switchAssetTool, executeSwitchAsset } from '@/features/agent/tools/switch-asset.tool';
+import { consultAnalystTool, executeConsultAnalyst } from '@/features/agent/tools/consult-analyst.tool';
+import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/agent/tools/validate-trade-intent.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
@@ -29,18 +31,12 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     let response;
     try {
       response = await createChatCompletionWithRetry({
-        model: 'meta-llama/llama-3.1-8b-instruct',
+        model: 'meta-llama/llama-3.3-70b-instruct',
         fallbackModels: [
-          'anthropic/claude-3.5-haiku',
-          'openai/gpt-4o-mini',
-          'qwen/qwen-2.5-72b-instruct',
-          'anthropic/claude-3.5-sonnet',
-          'liquid/lfm-2.5-2.6b:free',
-          'nvidia/nemotron-3.5-lightning:free',
-          'dots-studio/dots-3-note-preview:free'
+          'qwen/qwen-2.5-72b-instruct'
         ],
         messages: currentMessages,
-        tools: [getAccountStateTool, executeTradeTool, switchAssetTool],
+        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool],
       });
     } catch (error: any) {
       if (error.status === 400 && error.message?.includes('tool call validation failed')) {
@@ -94,8 +90,12 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           result = await executeGetAccountState();
         } else if (toolCall.function.name === 'execute_trade') {
           result = await executeExecuteTrade(toolCall.function.arguments);
+        } else if (toolCall.function.name === 'validate_trade_intent') {
+          result = await executeValidateTradeIntent(toolCall.function.arguments);
         } else if (toolCall.function.name === 'switch_monitored_asset') {
           result = await executeSwitchAsset(toolCall.function.arguments);
+        } else if (toolCall.function.name === 'consult_smart_analyst') {
+          result = await executeConsultAnalyst(toolCall.function.arguments, marketContext || '');
         }
 
         let displayResult = result;

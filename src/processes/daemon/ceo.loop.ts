@@ -9,9 +9,10 @@ import { runQuantAgent } from '@/features/agent/sub-agents/quant.agent';
 import { runMarketScanner } from '@/features/agent/sub-agents/market-scanner.agent';
 import { StateService } from '@/features/agent/services/state.service';
 import { prisma } from '@/shared/lib/prisma';
-import { getUnifiedBalance, getUnifiedPositions, VenueName } from '@/features/venues/venue.service';
+import { getUnifiedBalance, getUnifiedPositions, getClosedPositionInfo, VenueName } from '@/features/venues/venue.service';
 import { DAMAGE_CONTROL_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { startScrappyDaemon } from './scrappy.loop';
+import { ModelRouter } from '@/shared/constants/models';
 
 function getMarketStatus() {
   const now = DateTime.now();
@@ -52,6 +53,8 @@ let lastScannerTime = 0;
 let cachedScannerReport = "Aún no hay reporte del escáner de mercado.";
 
 let iterationCount = 0;
+let lastLoggedCoinsHash = "";
+let lastPositionsMap: Record<string, any> = {};
 
 async function runDaemonIteration(mode?: string) {
   iterationCount++;
@@ -71,8 +74,50 @@ async function runDaemonIteration(mode?: string) {
 
     // Calcular Unrealized PnL
     const positions = await getUnifiedPositions(venue).catch(() => []);
+    
+    // Rastrear posiciones cerradas
+    if (iterationCount > 1) {
+      const currentSymbols = new Set(positions.map(p => p.symbol));
+      for (const [symbol, pos] of Object.entries(lastPositionsMap)) {
+        if (!currentSymbols.has(symbol)) {
+          const closedInfo = await getClosedPositionInfo(venue, symbol).catch(() => null);
+          const reason = closedInfo ? closedInfo.reason : 'Broker (Automático)';
+          const pnl = closedInfo ? closedInfo.closedPnl : 0;
+          const pnlColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+          const sign = pnl >= 0 ? '+' : '';
+          console.log(`${ANSI_COLORS.CYAN}[CEO Trader]${ANSI_COLORS.RESET} 🛎️ ${ANSI_COLORS.YELLOW}Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${pnlColor}${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
+        }
+      }
+    }
+    
+    lastPositionsMap = {};
+    positions.forEach(p => lastPositionsMap[p.symbol] = p);
+
     const totalUnrealizedPnL = positions.reduce((sum, p) => sum + (p.unrealizedPl || 0), 0);
     const pnlPercentage = balance.cash > 0 ? totalUnrealizedPnL / balance.cash : 0;
+
+    const pnlColor = totalUnrealizedPnL >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+    console.log(`${ANSI_COLORS.CYAN}  💰 ESTADO DE BILLETERA (${venue.toUpperCase()})${ANSI_COLORS.RESET}`);
+    console.log(`${ANSI_COLORS.GRAY}  ├─ Total Equity    : ${ANSI_COLORS.GREEN}$${balance.cash.toFixed(2)}${ANSI_COLORS.RESET}`);
+    console.log(`${ANSI_COLORS.GRAY}  ├─ Margin Balance  : ${ANSI_COLORS.GREEN}$${futures.toFixed(2)}${ANSI_COLORS.RESET}`);
+    console.log(`${ANSI_COLORS.GRAY}  ├─ Spot (Liquidez) : ${ANSI_COLORS.GREEN}$${spot.toFixed(2)}${ANSI_COLORS.RESET}`);
+    console.log(`${ANSI_COLORS.GRAY}  └─ Unrealized PnL  : ${pnlColor}$${totalUnrealizedPnL.toFixed(2)} (${(pnlPercentage * 100).toFixed(2)}%)${ANSI_COLORS.RESET}`);
+
+    // Dynamic logging of spot coins
+    if (balance.coins && balance.coins.length > 0) {
+      const currentCoinsHash = JSON.stringify(balance.coins);
+      if (currentCoinsHash !== lastLoggedCoinsHash) {
+        lastLoggedCoinsHash = currentCoinsHash;
+        console.log(`${ANSI_COLORS.CYAN}  🪙 PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
+        balance.coins.forEach((c, index) => {
+          const isLast = index === balance.coins!.length - 1;
+          const prefix = isLast ? '└─' : '├─';
+          const usdVal = c.usdValue !== undefined ? ` (~$${c.usdValue.toFixed(2)})` : '';
+          console.log(`${ANSI_COLORS.GRAY}  ${prefix} ${c.symbol.padEnd(6)}: ${ANSI_COLORS.GREEN}${c.balance}${ANSI_COLORS.GRAY}${usdVal}${ANSI_COLORS.RESET}`);
+        });
+      }
+    }
+    console.log('');
 
     // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
     if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {

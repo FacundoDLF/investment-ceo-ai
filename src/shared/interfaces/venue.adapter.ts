@@ -1,9 +1,16 @@
+export interface CoinHolding {
+  symbol: string;
+  balance: number;
+  usdValue?: number;
+}
+
 export interface BalanceBreakdown {
   cash: number;
   spotPower?: number;
   dayTradingPower: number;
   overnightPower: number;
   marginMultiplier: number;
+  coins?: CoinHolding[];
 }
 
 export interface OrderParams {
@@ -73,4 +80,11 @@ export interface IVenueAdapter {
    * @returns Un array de posiciones.
    */
   getOpenPositions(): Promise<Position[]>;
+
+  /**
+   * Obtiene información sobre una posición cerrada recientemente.
+   * @param symbol Símbolo del activo.
+   * @returns Información de cierre o null si no se encontró.
+   */
+  getClosedPositionInfo?(symbol: string): Promise<{ reason: string; closedPnl: number } | null>;
 }

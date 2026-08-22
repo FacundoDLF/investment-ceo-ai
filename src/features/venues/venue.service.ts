@@ -48,3 +48,17 @@ export async function getUnifiedPositions(venueName: VenueName): Promise<Positio
   
   return await adapter.getOpenPositions();
 }
+
+export async function getClosedPositionInfo(venueName: VenueName, symbol: string): Promise<{ reason: string; closedPnl: number } | null> {
+  const adapter = venueRegistry[venueName];
+  
+  if (!adapter) {
+    throw new Error(`Venue no soportado: ${venueName}`);
+  }
+  
+  if (adapter.getClosedPositionInfo) {
+    return await adapter.getClosedPositionInfo(symbol);
+  }
+  
+  return null;
+}

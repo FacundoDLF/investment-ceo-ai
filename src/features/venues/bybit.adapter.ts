@@ -73,10 +73,19 @@ export class BybitAdapter implements IVenueAdapter {
 
         // Calcular el poder de SPOT (generalmente USDT disponible + USDC disponible)
         let spotPower = 0;
+        const coins: any[] = [];
         if (accountInfo.coin && Array.isArray(accountInfo.coin)) {
           for (const c of accountInfo.coin) {
+            const qty = parseFloat(c.walletBalance || '0');
+            if (qty > 0 || (c.coin === 'USDT' && qty !== 0)) { // Include negative USDT/USDC if applicable
+              coins.push({
+                symbol: c.coin,
+                balance: qty,
+                usdValue: c.usdValue ? parseFloat(c.usdValue) : undefined
+              });
+            }
             if (c.coin === 'USDT' || c.coin === 'USDC') {
-              spotPower += parseFloat(c.walletBalance || '0');
+              spotPower += qty;
             }
           }
         }
@@ -86,7 +95,8 @@ export class BybitAdapter implements IVenueAdapter {
           spotPower: spotPower,
           dayTradingPower: totalAvailable,
           overnightPower: totalAvailable,
-          marginMultiplier: 1
+          marginMultiplier: 1,
+          coins
         };
       }
       return { cash: 0, spotPower: 0, dayTradingPower: 0, overnightPower: 0, marginMultiplier: 1 };
@@ -316,5 +326,80 @@ export class BybitAdapter implements IVenueAdapter {
       currentPrice: parseFloat(pos.markPrice || '0'),
       avgEntryPrice: parseFloat(pos.avgPrice || '0'),
     }));
+  }
+
+  async getClosedPositionInfo(symbol: string): Promise<{ reason: string; closedPnl: number } | null> {
+    const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
+    const apiKey = useTestnet ? process.env.BYBIT_DEMO_API_KEY : process.env.BYBIT_API_KEY;
+    const secretKey = useTestnet ? process.env.BYBIT_DEMO_API_SECRET : process.env.BYBIT_API_SECRET;
+    const privateKeyPath = useTestnet ? undefined : process.env.BYBIT_API_PRIVATE_KEY_PATH;
+
+    const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
+
+    if (!apiKey) return null;
+
+    const timestamp = Date.now().toString();
+    const recvWindow = '5000';
+    const queryString = `category=linear&symbol=${symbol}&limit=1`;
+    const signString = timestamp + apiKey + recvWindow + queryString;
+    
+    let signature = '';
+    if (secretKey) {
+      signature = crypto.createHmac('sha256', secretKey).update(signString).digest('hex');
+    } else if (privateKeyPath) {
+      const fs = require('fs');
+      try {
+        const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        const sign = crypto.createSign('SHA256');
+        sign.update(signString);
+        signature = sign.sign(privateKey, 'base64');
+      } catch (err: any) {
+        console.error('❌ Error leyendo la clave privada RSA de Bybit:', err.message);
+        return null;
+      }
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/v5/position/closed-pnl?${queryString}`, {
+        method: 'GET',
+        headers: {
+          'X-BAPI-API-KEY': apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': signature,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('❌ Bybit Closed PnL HTTP Error Response:', response.status);
+        return null;
+      }
+
+      const json = await response.json();
+      if (json.retCode !== 0) {
+        console.error('❌ Bybit API Error (closed-pnl):', json.retMsg);
+        return null;
+      }
+
+      const list = json.result?.list || [];
+      if (list.length > 0) {
+        const closedPos = list[0];
+        let reason = closedPos.execType || 'Ejecución Automática';
+        if (reason === 'StopLoss') reason = 'Stop Loss';
+        else if (reason === 'TakeProfit') reason = 'Take Profit';
+        else if (reason === 'PartialTakeProfit') reason = 'Take Profit Parcial';
+        else if (reason === 'PartialStopLoss') reason = 'Stop Loss Parcial';
+        else if (reason === 'Bust') reason = 'Liquidación';
+        
+        return {
+          reason,
+          closedPnl: parseFloat(closedPos.closedPnl || '0')
+        };
+      }
+      return null;
+    } catch (error: any) {
+      console.error('❌ Bybit Fetch Error (closed-pnl):', error.message);
+      return null;
+    }
   }
 }

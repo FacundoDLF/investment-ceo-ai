@@ -6,7 +6,7 @@ export const getAccountStateTool: ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'get_account_state',
-    description: 'Obtiene el saldo actual de la cuenta consolidado desde los brokers (Venues), las POSICIONES ABIERTAS, el capital disponible y los desafíos/objetivos activos.',
+    description: 'Obtiene el saldo actual de la cuenta consolidado desde los brokers (Venues), el PORTAFOLIO SPOT (Monedas en Cartera), las POSICIONES ABIERTAS (Derivados), el capital disponible y los desafíos/objetivos activos.',
     parameters: {
       type: 'object',
       properties: {},

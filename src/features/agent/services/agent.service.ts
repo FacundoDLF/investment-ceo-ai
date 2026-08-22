@@ -144,7 +144,10 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
             const bybitPower = parsed?.consolidatedBalance?.bybit?.dayTradingPower ? parsed.consolidatedBalance.bybit.dayTradingPower.toFixed(2) : '0';
             const alpacaCash = parsed?.consolidatedBalance?.alpaca?.cash ? parsed.consolidatedBalance.alpaca.cash.toFixed(2) : '0';
             const positions = (parsed?.positions?.alpaca?.length || 0) + (parsed?.positions?.bybit?.length || 0);
-            displayResult = `Cash Bybit: $${bybitCash} (Poder Spot: $${bybitSpot} | Poder Futuros: $${bybitPower}) | Cash Alpaca: $${alpacaCash} | Posiciones Totales: ${positions}`;
+            displayResult = `\n` +
+              `${ANSI_COLORS.GRAY}  ├─ Bybit  : Cash ${ANSI_COLORS.GREEN}$${bybitCash}${ANSI_COLORS.GRAY} (Spot: ${ANSI_COLORS.GREEN}$${bybitSpot}${ANSI_COLORS.GRAY} | Futuros: ${ANSI_COLORS.GREEN}$${bybitPower}${ANSI_COLORS.GRAY})${ANSI_COLORS.RESET}\n` +
+              `${ANSI_COLORS.GRAY}  ├─ Alpaca : Cash ${ANSI_COLORS.GREEN}$${alpacaCash}${ANSI_COLORS.RESET}\n` +
+              `${ANSI_COLORS.GRAY}  └─ Posiciones Totales: ${ANSI_COLORS.YELLOW}${positions}${ANSI_COLORS.RESET}`;
           } else if (toolCall.function.name === 'execute_trade') {
             if (parsed?.error) {
               displayResult = `❌ Error: ${parsed.error}`;

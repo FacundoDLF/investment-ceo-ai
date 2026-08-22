@@ -101,7 +101,11 @@ Reglas Críticas:
           // Latido cada 30 segundos si está inactivo o holdeando
           if (now - lastHeartbeatTime > 30000) {
             if (currentScalpPosition) {
-              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${currentScalpPosition.side.toUpperCase()}) | Posición actual: ${pnlPct > 0 ? ANSI_COLORS.GREEN + '+' : ANSI_COLORS.RED}${pnlPct.toFixed(3)}%${ANSI_COLORS.RESET}`);
+              const currentPrice = currentScalpPosition.side === 'buy' ? priceData.bid : priceData.ask;
+              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${currentScalpPosition.side.toUpperCase()}):`);
+              console.log(`${ANSI_COLORS.GRAY}  ├─ Entrada : $${currentScalpPosition.entryPrice}${ANSI_COLORS.RESET}`);
+              console.log(`${ANSI_COLORS.GRAY}  ├─ Actual  : $${currentPrice.toFixed(2)}${ANSI_COLORS.RESET}`);
+              console.log(`${ANSI_COLORS.GRAY}  └─ Var %     : ${pnlPct >= 0 ? ANSI_COLORS.GREEN + '+' : ANSI_COLORS.RED}${pnlPct.toFixed(3)}%${ANSI_COLORS.RESET}`);
             } else {
               console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
             }

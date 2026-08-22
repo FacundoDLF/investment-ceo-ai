@@ -34,7 +34,8 @@ export class AlpacaAdapter implements IVenueAdapter {
       spotPower: parseFloat(data.cash || '0'),
       dayTradingPower: parseFloat(data.daytrading_buying_power || data.buying_power || '0'),
       overnightPower: parseFloat(data.regt_buying_power || data.buying_power || '0'),
-      marginMultiplier: parseFloat(data.multiplier || '1')
+      marginMultiplier: parseFloat(data.multiplier || '1'),
+      coins: []
     };
   }
 

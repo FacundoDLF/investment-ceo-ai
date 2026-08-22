@@ -37,7 +37,7 @@ export async function runScrappyIteration() {
         if (Math.abs(pnlPct) >= 0.5) {
           const now = Date.now();
           if (now - lastLogTime > 60000) { // No floodear si se queda colgado
-            console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} 🚨 RENTABILIDAD ANORMAL DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}`);
+            console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🚨 RENTABILIDAD ANORMAL DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}`);
             lastLogTime = now;
           }
         }
@@ -74,13 +74,7 @@ Reglas Críticas:
     };
 
     const response = await createChatCompletionWithRetry({
-      model: 'meta-llama/llama-3.3-70b-instruct',
-      fallbackModels: [
-        'qwen/qwen-2.5-72b-instruct',
-        'google/gemma-4-31b-it:free',
-        'z-ai/glm-5.2:free',
-        'openrouter/free'
-      ],
+      role: 'EXECUTOR',
       messages: [{ role: 'system', content: systemPrompt }],
       tools: [scalpTool],
       tool_choice: 'auto'
@@ -95,21 +89,21 @@ Reglas Críticas:
 
         // Logging visual amigable (Modo Perro de Caza)
         if (action === 'OPEN_LONG' || action === 'OPEN_SHORT') {
-          console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} ⚡ ¡Grrr! Atacó con un ${action === 'OPEN_LONG' ? 'LONG' : 'SHORT'} en ${symbol} a $${midPrice.toFixed(2)}`);
+          console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} ⚡ ¡Grrr! Atacó con un ${action === 'OPEN_LONG' ? 'LONG' : 'SHORT'} en ${symbol} a $${midPrice.toFixed(2)}`);
         } else if (action === 'CLOSE_POSITION') {
           if (pnlPct > 0) {
-            console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} 🥩 ¡Guau! Se escapó con ${symbol} (Premio: +${pnlPct.toFixed(2)}%)`);
+            console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🥩 ¡Guau! Se escapó con ${symbol} (Premio: +${pnlPct.toFixed(2)}%)`);
           } else {
-            console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} 🐕‍🦺 ¡Yikes! Huyó de ${symbol} (Pérdida: ${pnlPct.toFixed(2)}%)`);
+            console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕‍🦺 ¡Yikes! Huyó de ${symbol} (Pérdida: ${pnlPct.toFixed(2)}%)`);
           }
         } else {
           const now = Date.now();
           // Latido cada 30 segundos si está inactivo o holdeando
           if (now - lastHeartbeatTime > 30000) {
             if (currentScalpPosition) {
-              console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${currentScalpPosition.side.toUpperCase()}) | Posición actual: ${pnlPct > 0 ? '\${ANSI_COLORS.GREEN}+' : '\${ANSI_COLORS.RED}'}${pnlPct.toFixed(3)}%\${ANSI_COLORS.RESET}`);
+              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${currentScalpPosition.side.toUpperCase()}) | Posición actual: ${pnlPct > 0 ? ANSI_COLORS.GREEN + '+' : ANSI_COLORS.RED}${pnlPct.toFixed(3)}%${ANSI_COLORS.RESET}`);
             } else {
-              console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
+              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
             }
             lastHeartbeatTime = now;
           }
@@ -140,7 +134,7 @@ async function executeScalpAction(action: string, symbol: string, budget: number
 
       // Imprimir log solo si la ganancia/pérdida es anormal (> 0.5%)
       if (Math.abs(pnlPct) >= 0.5) {
-        console.log(`\${ANSI_COLORS.MAGENTA}[Scrappy]\${ANSI_COLORS.RESET} 💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
+        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
         // Registrar en DB para el historial
         await prisma.executionLog.create({
           data: {

@@ -8,6 +8,7 @@ import { closePositionTool, executeClosePosition } from '@/features/agent/tools/
 import { commandScrappyTool, executeCommandScrappy } from '@/features/agent/tools/command-scrappy.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { getFriendlyToolName } from '@/shared/utils/tool-names';
+import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
 export async function runAgentCycle(userMessage?: string, marketContext?: string) {
@@ -34,19 +35,15 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     let response;
     try {
       response = await createChatCompletionWithRetry({
-        model: 'meta-llama/llama-3.3-70b-instruct',
-        fallbackModels: [
-          'qwen/qwen-2.5-72b-instruct',
-          'google/gemma-4-31b-it:free',
-          'z-ai/glm-5.2:free',
-          'openrouter/free'
-        ],
+        role: 'CEO',
         messages: currentMessages,
         tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool],
       });
     } catch (error: any) {
-      if (error.status === 400 && error.message?.includes('tool call validation failed')) {
-        console.warn('\${LOG_PREFIX.SISTEMA_CRITICO} Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...\${ANSI_COLORS.RESET}');
+      if ((error.status === 400 && error.message?.includes('tool call validation failed')) || 
+          error.message?.includes('tool_use_failed') ||
+          error.message?.includes('tool call')) {
+        console.warn(`${LOG_PREFIX.SISTEMA_CRITICO} Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...${ANSI_COLORS.RESET}`);
         currentMessages.push({
           role: 'user',
           content: 'Tu última llamada a herramienta fue rechazada por el servidor porque usaste un nombre inválido (ej: agregaste <|channel|>) o violaste el esquema JSON. Responde con el nombre de herramienta y formato exacto requerido.'
@@ -84,7 +81,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       const contentStr = responseMessage.content.trim();
       const titleMatch = contentStr.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
       const displayContent = titleMatch ? titleMatch[1].trim() + '...' : 'Procesando estrategia...';
-      console.log(`\n\${LOG_PREFIX.CEO_TRADER} Razonando:\${ANSI_COLORS.RESET} ${displayContent} \x1b[90m(pensamiento oculto)\${ANSI_COLORS.RESET}`);
+      console.log(`\n${LOG_PREFIX.CEO_TRADER} Razonando:${ANSI_COLORS.RESET} ${displayContent} \x1b[90m(pensamiento oculto)${ANSI_COLORS.RESET}`);
     }
 
     currentMessages.push(responseMessage as ChatCompletionMessageParam);
@@ -92,7 +89,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
       for (const toolCall of responseMessage.tool_calls) {
         let result: any;
-        console.log(`\${LOG_PREFIX.CEO_TRADER} ${getFriendlyToolName(toolCall.function.name)}\${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.CEO_TRADER} ${getFriendlyToolName(toolCall.function.name)}${ANSI_COLORS.RESET}`);
 
         try {
           const args = JSON.parse(toolCall.function.arguments);
@@ -112,12 +109,12 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
               thesis: 'Tesis'
             };
             const formattedArgs = Object.entries(args)
-              .map(([k, v]) => `\${LOG_PREFIX.CEO_TRADER} \${ANSI_COLORS.WHITE}${keyTranslations[k] || k}:\${ANSI_COLORS.RESET} ${v}`)
+              .map(([k, v]) => `${LOG_PREFIX.CEO_TRADER} ${ANSI_COLORS.WHITE}${keyTranslations[k] || k}:${ANSI_COLORS.RESET} ${v}`)
               .join('\n');
             console.log(formattedArgs);
           }
         } catch (e) {
-          console.log(`\${ANSI_COLORS.WHITE}Argumentos: ${toolCall.function.arguments}\${ANSI_COLORS.RESET}`);
+          console.log(`${ANSI_COLORS.WHITE}Argumentos: ${toolCall.function.arguments}${ANSI_COLORS.RESET}`);
         }
 
         if (toolCall.function.name === 'get_account_state') {
@@ -156,7 +153,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
             }
           } else if (toolCall.function.name === 'validate_trade_intent') {
             if (parsed?.status === 'APPROVED_TECHNICAL') {
-              displayResult = `\${ANSI_COLORS.GREEN}Aprobado\${ANSI_COLORS.RESET}`;
+              displayResult = `${ANSI_COLORS.GREEN}Aprobado${ANSI_COLORS.RESET}`;
             } else {
               displayResult = `❌ Rechazado: ${parsed?.reason || parsed?.error || 'Motivo desconocido'}`;
             }
@@ -181,13 +178,13 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
         }
 
         if (toolCall.function.name === 'consult_smart_analyst') {
-          console.log(`\${ANSI_COLORS.GREEN}[Sistema]\${ANSI_COLORS.RESET} ${displayResult}`);
+          console.log(`${ANSI_COLORS.GREEN}[Sistema]${ANSI_COLORS.RESET} ${displayResult}`);
         } else {
           let resultTitle = `Resultado de ${getFriendlyToolName(toolCall.function.name)}`;
           if (toolCall.function.name === 'validate_trade_intent') {
             resultTitle = `Resultados de Validación`;
           }
-          console.log(`\${ANSI_COLORS.GREEN}[Sistema] ${resultTitle}:\${ANSI_COLORS.RESET} ${displayResult}`);
+          console.log(`${ANSI_COLORS.GREEN}[Sistema] ${resultTitle}:${ANSI_COLORS.RESET} ${displayResult}`);
         }
 
         currentMessages.push({

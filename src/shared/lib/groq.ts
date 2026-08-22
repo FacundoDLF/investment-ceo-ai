@@ -2,6 +2,7 @@ import Groq from 'groq-sdk';
 import type { ChatCompletionCreateParamsNonStreaming, ChatCompletion } from 'groq-sdk/resources/chat/completions';
 
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
+import { ModelRouter, ModelRole, AIModel } from '@/shared/constants/models';
 
 export const nativeGroqClient = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -23,88 +24,77 @@ export const openRouterClient = new Groq({
   }
 });
 
-export interface ExtendedChatCompletionParams extends ChatCompletionCreateParamsNonStreaming {
-  fallbackModels?: string[];
+export interface ExtendedChatCompletionParams extends Omit<ChatCompletionCreateParamsNonStreaming, 'model'> {
+  model?: string;
+  role?: ModelRole;
 }
-
-const globalModelCooldowns = new Map<string, number>();
 
 export async function createChatCompletionWithRetry(
   params: ExtendedChatCompletionParams,
   maxRetries = 100
 ): Promise<ChatCompletion> {
   let attempt = 0;
-  const allModelsRaw = [params.model, ...(params.fallbackModels || [])];
-  const allModels: string[] = [...allModelsRaw];
-  const permanentlyFailedModels = new Set<string>();
 
   while (true) {
-    const now = Date.now();
-    let availableModelIndex = -1;
-    let minWaitTime = Infinity;
-    let nextModelToFree = '';
+    // Obtener el mejor modelo disponible según el rol (ya filtrado por salud)
+    const available = params.role ? ModelRouter.getAvailableForRole(params.role) : [];
 
-    for (let i = 0; i < allModels.length; i++) {
-      const model = allModels[i];
-      if (permanentlyFailedModels.has(model)) continue;
-
-      const cooldown = globalModelCooldowns.get(model) || 0;
-      if (cooldown <= now) {
-        availableModelIndex = i;
-        break;
-      } else {
-        const waitTime = cooldown - now;
-        if (waitTime < minWaitTime) {
-          minWaitTime = waitTime;
-          nextModelToFree = model;
-        }
-      }
-    }
-
-    if (availableModelIndex === -1) {
-      if (minWaitTime === Infinity) {
-        console.error(`\${ANSI_COLORS.RED}[API Groq] Fallo irreversible: todos los modelos fallaron permanentemente.\${ANSI_COLORS.RESET}`);
-        throw new Error("Todos los modelos fallaron permanentemente (400, 403, 404, 5xx)");
-      }
-
-      attempt++;
-      console.warn(`[LLM API] Todos los modelos en Cooldown. Esperando ${minWaitTime}ms hasta que se libere ${nextModelToFree}...`);
-      await new Promise((resolve) => setTimeout(resolve, minWaitTime));
+    if (available.length === 0 && !params.model) {
+      // Blackout total: todos los modelos agotados. En lugar de crashear,
+      // esperamos 2 minutos y reseteamos la salud para reintentar.
+      console.error(`${ANSI_COLORS.RED}[API] ⚠️  Blackout total: sin modelos disponibles para el rol "${params.role}". Esperando 120s para reintentar...${ANSI_COLORS.RESET}`);
+      await new Promise(resolve => setTimeout(resolve, 120_000));
+      ModelRouter.resetAllHealth();
+      console.warn(`${ANSI_COLORS.YELLOW}[API] 🔄 Salud de modelos reseteada. Reintentando...${ANSI_COLORS.RESET}`);
+      attempt = 0;
       continue;
     }
 
-    const currentModel = allModels[availableModelIndex];
-    const client = currentModel.includes('/') ? openRouterClient : nativeGroqClient;
+    // Si se pasa model directo (override puntual), usarlo. Si no, tomar el primero disponible del rol.
+    const currentModel = params.model
+      ? { uid: params.model, id: params.model, provider: (params.model.includes('/') ? 'openrouter' : 'groq') as 'groq' | 'openrouter', tier: 'free' as const }
+      : available[0];
 
-    if (currentModel !== params.model) {
-      const isFree = currentModel.endsWith(':free');
-      const warningType = isFree ? 'Free Version' : 'Modelo Suplente';
-      console.warn(`\${ANSI_COLORS.YELLOW}[Sistema] ⚠️ ATENCIÓN: Usando ${warningType} (${currentModel}) por fallo del principal.\${ANSI_COLORS.RESET}`);
+    const client = currentModel.provider === 'openrouter' ? openRouterClient : nativeGroqClient;
+
+    // Registrar el modelo activo (notifica en consola sólo si cambió)
+    if (params.role) {
+      ModelRouter.trackActiveModel(params.role, currentModel as AIModel);
+    }
+
+    if (attempt > 0) {
+      const providerLabel = currentModel.provider === 'groq' ? 'Groq' : 'OpenRouter';
+      const tierLabel = currentModel.tier === 'free' ? 'Free' : 'Paid';
+      console.warn(`${ANSI_COLORS.YELLOW}[Sistema] ⚠️ Fallback activado: usando ${currentModel.id} (${providerLabel} / ${tierLabel})${ANSI_COLORS.RESET}`);
     }
 
     try {
-      const currentParams = { max_tokens: 500, ...params, model: currentModel };
-      delete (currentParams as any).fallbackModels;
+      const currentParams = { max_tokens: 500, ...params, model: currentModel.id };
+      delete (currentParams as any).role;
       return await client.chat.completions.create(currentParams as ChatCompletionCreateParamsNonStreaming);
     } catch (error: any) {
       const isRateLimit = error?.status === 429 || error?.status === 413;
       const isNetworkError = !error?.status || error?.status >= 500 || error?.name === 'APITimeoutError';
+      const isToolUseFailed = error?.status === 400 && (error?.error?.code === 'tool_use_failed' || error?.message?.includes('tool call'));
+      const isModelError = error?.status === 404 || error?.status === 403 || (error?.status === 400 && !isToolUseFailed);
 
-      if (error?.status === 402) {
-        if (!currentModel.endsWith(':free')) {
-          console.warn(`\${ANSI_COLORS.RED}[API] Error 402 Payment Required en ${currentModel}. Cambiando a modelos gratuitos...\${ANSI_COLORS.RESET}`);
-          // Marcar todos los modelos de pago como fallidos para no perder tiempo
-          for (const m of allModels) {
-            if (!m.endsWith(':free')) permanentlyFailedModels.add(m);
-          }
-          continue;
-        } else {
-          console.error(`\${ANSI_COLORS.RED}[API] Error 402 Payment Required en modelo gratuito ${currentModel}. Tu cuenta de OpenRouter está totalmente bloqueada. Abortando.\${ANSI_COLORS.RESET}`);
-          throw new Error(`API Key bloqueada (402 Payment Required) al intentar usar modelo gratuito ${currentModel}.`);
-        }
+      if (isToolUseFailed) {
+        // Groq API throws 400 when the LLM generates invalid JSON for a tool call.
+        // This is a generation error, not an endpoint failure. We should not deprecate the model.
+        throw new Error(`LLM Generation Error (400 tool_use_failed): ${error?.message}`);
       }
 
-      const isModelError = error?.status === 404 || error?.status === 403 || error?.status === 400;
+      if (error?.status === 402) {
+        if (currentModel.tier === 'paid') {
+          console.warn(`${ANSI_COLORS.RED}[API] Error 402 Payment Required en ${currentModel.id} (${currentModel.provider}). Detalles: ${error?.message || 'Sin fondos'}. Desactivando todos los modelos de pago...${ANSI_COLORS.RESET}`);
+          ModelRouter.markAllPaidAsFailed('402 Payment Required');
+          attempt++;
+          continue;
+        } else {
+          console.error(`${ANSI_COLORS.RED}[API] Error 402 en modelo free ${currentModel.id}. Detalles: ${error?.message || 'Cuenta bloqueada'}. Abortando.${ANSI_COLORS.RESET}`);
+          throw new Error(`API Key bloqueada (402) en modelo gratuito ${currentModel.id}.`);
+        }
+      }
 
       if (isRateLimit) {
         let waitTimeMs = 0;
@@ -122,11 +112,9 @@ export async function createChatCompletionWithRetry(
           const parsed = Number(cleaned);
           if (!Number.isNaN(parsed) && parsed > 0) {
             if (parsed > 1577836800000) {
-              const wait = parsed - Date.now();
-              waitTimeMs = wait > 0 ? wait : 1000;
+              waitTimeMs = Math.max(parsed - Date.now(), 1000);
             } else if (parsed > 1577836800) {
-              const wait = (parsed * 1000) - Date.now();
-              waitTimeMs = wait > 0 ? wait : 1000;
+              waitTimeMs = Math.max((parsed * 1000) - Date.now(), 1000);
             } else {
               waitTimeMs = parsed * 1000;
             }
@@ -144,28 +132,35 @@ export async function createChatCompletionWithRetry(
 
         if (waitTimeMs <= 0) waitTimeMs = 15000;
 
-        globalModelCooldowns.set(currentModel, Date.now() + waitTimeMs);
-        console.warn(`\${ANSI_COLORS.RED}[Model Fallback]\${ANSI_COLORS.RESET} RateLimit (429) en ${currentModel}. Cooldown: ${waitTimeMs}ms...`);
+        // Marcar por UID para no contaminar el mismo modelo en otro proveedor
+        ModelRouter.markAsRateLimited(currentModel.uid, waitTimeMs);
+        console.warn(`${ANSI_COLORS.RED}[Model Fallback]${ANSI_COLORS.RESET} RateLimit (429) en ${currentModel.id} [${currentModel.provider}]. Cooldown: ${Math.round(waitTimeMs / 1000)}s. Detalles: ${error?.message || ''}`);
+        attempt++;
         continue;
       }
 
       if (isNetworkError || isModelError) {
-        let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported (${error?.status})`;
-        console.warn(`\${ANSI_COLORS.RED}[Model Fallback]\${ANSI_COLORS.RESET} ${errorType} en ${currentModel}. Descartado para esta solicitud...`);
+        const errorType = isNetworkError
+          ? `Network/Timeout (${error?.status || '5xx'})`
+          : `ModelNotFound/Unsupported (${error?.status})`;
+        console.warn(`${ANSI_COLORS.RED}[Model Fallback]${ANSI_COLORS.RESET} ${errorType} en ${currentModel.id} [${currentModel.provider}]. Detalles: ${error?.message || ''}. Descartado.`);
 
-        // Log al postmortem
+        // Postmortem
         try {
           const fs = require('fs');
           fs.writeFileSync('error_postmortem.json', JSON.stringify({
             timestamp: new Date().toISOString(),
-            model: currentModel,
+            uid: currentModel.uid,
+            model: currentModel.id,
+            provider: currentModel.provider,
             status: error?.status,
-            error: error?.message,
-            headers: error?.headers
+            error: error?.message
           }, null, 2));
-        } catch (e) { }
+        } catch (_) { }
 
-        permanentlyFailedModels.add(currentModel);
+        // Marcar por UID — solo este proveedor queda penalizado
+        ModelRouter.markAsFailed(currentModel.uid, error?.message);
+        attempt++;
         continue;
       }
 
@@ -173,4 +168,3 @@ export async function createChatCompletionWithRetry(
     }
   }
 }
-

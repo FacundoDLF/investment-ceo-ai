@@ -3,6 +3,7 @@ import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/to
 import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
 import { RiskEngine } from '@/features/risk/risk.engine';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
+import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import { z } from 'zod';
 
@@ -35,7 +36,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     { role: 'user', content: `Analiza la viabilidad cuantitativa para el activo: ${asset}` }
   ];
 
-  console.log(`\${LOG_PREFIX.RICK_QUEEN} Iniciando análisis cuantitativo para:`, asset);
+  console.log(`${LOG_PREFIX.RICK_QUEEN} Iniciando análisis cuantitativo para:`, asset);
 
   const tools: ChatCompletionTool[] = [
     getVenueBalanceTool,
@@ -44,13 +45,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
   ];
 
   let response = await createChatCompletionWithRetry({
-    model: 'meta-llama/llama-3.3-70b-instruct',
-    fallbackModels: [
-      'qwen/qwen-2.5-72b-instruct',
-      'google/gemma-4-31b-it:free',
-      'z-ai/glm-5.2:free',
-      'openrouter/free'
-    ],
+    role: 'EXECUTOR',
     messages,
     tools,
   });
@@ -82,7 +77,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\${ANSI_COLORS.MAGENTA}[Rick Queen]\${ANSI_COLORS.RESET} ${getFriendlyToolName(toolCall.function.name)}`);
+      console.log(`${ANSI_COLORS.MAGENTA}[Rick Queen]${ANSI_COLORS.RESET} ${getFriendlyToolName(toolCall.function.name)}`);
       let toolResult = '';
       
       try {
@@ -111,13 +106,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     }
 
     response = await createChatCompletionWithRetry({
-      model: 'meta-llama/llama-3.3-70b-instruct',
-      fallbackModels: [
-        'qwen/qwen-2.5-72b-instruct',
-        'google/gemma-4-31b-it:free',
-        'z-ai/glm-5.2:free',
-        'openrouter/free'
-      ],
+      role: 'EXECUTOR',
       messages,
       tools,
     });

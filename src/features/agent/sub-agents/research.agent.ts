@@ -3,6 +3,7 @@ import { serperSearchTool, executeSerperSearch } from '@/features/agent/tools/se
 import { tavilyResearchTool, executeTavilyResearch } from '@/features/agent/tools/tavily-research.tool';
 import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
+import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 
 const RESEARCH_MANDATE = `Eres el Research Agent del fondo cuantitativo.
 Tu único propósito es utilizar tus herramientas de búsqueda para sintetizar el contexto macroeconómico actual y eventos que afecten los mercados.
@@ -16,16 +17,10 @@ export async function runResearchAgent(query: string): Promise<string> {
     { role: 'user', content: query }
   ];
 
-  console.log(`\${LOG_PREFIX.RICHARD_NEWMAN} Iniciando investigación sobre:`, query);
+  console.log(`${LOG_PREFIX.RICHARD_NEWMAN} Iniciando investigación sobre:`, query);
 
   let response = await createChatCompletionWithRetry({
-    model: 'meta-llama/llama-3.3-70b-instruct',
-    fallbackModels: [
-      'qwen/qwen-2.5-72b-instruct',
-      'google/gemma-4-31b-it:free',
-      'z-ai/glm-5.2:free',
-      'openrouter/free'
-    ],
+    role: 'ANALYST',
     messages,
     tools: [serperSearchTool, tavilyResearchTool],
   });
@@ -57,18 +52,18 @@ export async function runResearchAgent(query: string): Promise<string> {
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\${ANSI_COLORS.MAGENTA}[Richard Newman]\${ANSI_COLORS.RESET} ${getFriendlyToolName(toolCall.function.name)}`);
+      console.log(`${ANSI_COLORS.MAGENTA}[Richard Newman]${ANSI_COLORS.RESET} ${getFriendlyToolName(toolCall.function.name)}`);
       let toolResult = '';
       
       try {
         if (toolCall.function.name === 'serper_search') {
-          console.log(`\${LOG_PREFIX.RICHARD_NEWMAN} Informando...`);
+          console.log(`${LOG_PREFIX.RICHARD_NEWMAN} Informando...`);
           const result = await executeSerperSearch(toolCall.function.arguments);
           toolResult = JSON.stringify(result);
           try {
              const q = JSON.parse(toolCall.function.arguments).query || "Búsqueda web";
              const shortQuery = q.split(' ').slice(0, 3).join(' ');
-             console.log(`\${ANSI_COLORS.MAGENTA}[Richard Newman]\${ANSI_COLORS.RESET} CEO Informado. Tema: ${shortQuery}`);
+             console.log(`${ANSI_COLORS.MAGENTA}[Richard Newman]${ANSI_COLORS.RESET} CEO Informado. Tema: ${shortQuery}`);
           } catch(e) {}
         } else if (toolCall.function.name === 'tavily_research') {
           const result = await executeTavilyResearch(toolCall.function.arguments);
@@ -77,7 +72,7 @@ export async function runResearchAgent(query: string): Promise<string> {
           toolResult = `Herramienta desconocida: ${toolCall.function.name}`;
         }
       } catch (error: any) {
-        console.error(`\${LOG_PREFIX.SISTEMA_CRITICO} [Richard Newman] Error crítico:\${ANSI_COLORS.RESET}`, error.message);
+        console.error(`${LOG_PREFIX.SISTEMA_CRITICO} [Richard Newman] Error crítico:${ANSI_COLORS.RESET}`, error.message);
         throw error;
       }
       
@@ -89,13 +84,7 @@ export async function runResearchAgent(query: string): Promise<string> {
     }
 
     response = await createChatCompletionWithRetry({
-      model: 'meta-llama/llama-3.3-70b-instruct',
-      fallbackModels: [
-        'qwen/qwen-2.5-72b-instruct',
-        'google/gemma-4-31b-it:free',
-        'z-ai/glm-5.2:free',
-        'openrouter/free'
-      ],
+      role: 'ANALYST',
       messages,
       tools: [serperSearchTool, tavilyResearchTool],
     });
@@ -107,7 +96,7 @@ export async function runResearchAgent(query: string): Promise<string> {
   if (finalReport) {
     // Tomamos solo la primera oración para mostrar en consola como resumen
     const firstSentence = finalReport.split('.')[0] + '.';
-    console.log(`\${ANSI_COLORS.MAGENTA}[Richard Newman]\${ANSI_COLORS.RESET} Resumen de investigación: ${firstSentence}`);
+    console.log(`${ANSI_COLORS.MAGENTA}[Richard Newman]${ANSI_COLORS.RESET} Resumen de investigación: ${firstSentence}`);
   }
   return finalReport;
 }

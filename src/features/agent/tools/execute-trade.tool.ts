@@ -98,7 +98,7 @@ export async function executeExecuteTrade(args: string) {
     // La validación de PAPER_MODE_ONLY ahora se realiza dentro de los adaptadores (alpaca.adapter.ts y bybit.adapter.ts)
     // ruteando la petición a las URLs y credenciales de Demo/Paper.
     if (process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined) {
-      console.info(`\${ANSI_COLORS.YELLOW}[PAPER MODE]\${ANSI_COLORS.RESET} 📝 Enviando orden simulada en ${params.venue} para ${params.symbol}...`);
+      console.info(`${ANSI_COLORS.YELLOW}[PAPER MODE]${ANSI_COLORS.RESET} 📝 Enviando orden simulada en ${params.venue} para ${params.symbol}...`);
     }
 
     const result = await executeOrder(params.venue as VenueName, {
@@ -145,7 +145,7 @@ export async function executeExecuteTrade(args: string) {
 
     return JSON.stringify(result);
   } catch (error: any) {
-    console.log(`\${ANSI_COLORS.RED}[Broker Error]\${ANSI_COLORS.RESET} ❌ ${error.message}`);
+    console.log(`${ANSI_COLORS.RED}[Broker Error]${ANSI_COLORS.RESET} ❌ ${error.message}`);
     return JSON.stringify({ error: error.message });
   }
 }

@@ -1,7 +1,8 @@
 {
-  "timestamp": "2026-08-22T18:16:49.721Z",
-  "model": "qwen/qwen-2-72b-instruct:free",
-  "status": 404,
-  "error": "404 {\"error\":{\"message\":\"No endpoints found for qwen/qwen-2-72b-instruct:free.\",\"code\":404},\"user_id\":\"user_3IE4uzqVmVB96xTqOzJ0KlGkdeC\"}",
-  "headers": {}
+  "timestamp": "2026-08-22T19:59:49.507Z",
+  "uid": "groq::openai/gpt-oss-20b",
+  "model": "openai/gpt-oss-20b",
+  "provider": "groq",
+  "status": 400,
+  "error": "400 {\"error\":{\"message\":\"Tool call validation failed: tool call validation failed: attempted to call tool 'scapl_action' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"scapl_action\\\", \\\"arguments\\\": {\\\"action\\\":\\\"HOLD\\\"}}\"}}"
 }

@@ -204,6 +204,10 @@ async function runDaemonIteration(mode?: string) {
     }
 
   } catch (error: any) {
+    if (error.message?.includes('tool_use_failed') || error.message?.includes('tool call validation failed')) {
+      console.warn(`${LOG_PREFIX.SISTEMA_CRITICO} [Aviso] Un sub-agente falló al generar JSON válido (tool_use_failed). Ignorando ciclo...${ANSI_COLORS.RESET}`);
+      return;
+    }
     console.error(`${LOG_PREFIX.SISTEMA_CRITICO} [Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}${ANSI_COLORS.RESET}`);
     console.error(`${LOG_PREFIX.SISTEMA_CRITICO} Deteniendo el daemon por completo para revisión manual.${ANSI_COLORS.RESET}`);
     process.exit(1);

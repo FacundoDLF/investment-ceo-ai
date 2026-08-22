@@ -1,7 +1,8 @@
 import { runScrappyIteration } from '@/features/agent/sub-agents/scrappy.agent';
+import { LOG_PREFIX } from '@/shared/constants/colors';
 
 export async function startScrappyDaemon() {
-  console.log(`\${LOG_PREFIX.SISTEMA} Iniciando demonio de Scrappy (Scalper HFT)...`);
+  console.log(`${LOG_PREFIX.SISTEMA} Iniciando demonio de Scrappy (Scalper HFT)...`);
   
   // Bucle infinito silencioso
   while (true) {

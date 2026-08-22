@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createChatCompletionWithRetry, ExtendedChatCompletionParams } from '@/shared/lib/groq';
+import { LOG_PREFIX } from '@/shared/constants/colors';
 
 export const consultAnalystSchema = z.object({
   duda: z.string().describe('Tu duda, consulta o análisis parcial sobre el cual necesitas consejo estratégico del Agente Inteligente.'),
@@ -25,27 +26,21 @@ export async function executeConsultAnalyst(args: string, marketContext: string)
     const parsedArgs = JSON.parse(args);
     const params = consultAnalystSchema.parse(parsedArgs);
 
-    console.log(`\${LOG_PREFIX.EXPERTO_SMART} Analizando consulta táctica del CEO Trader...`);
+    console.log(`${LOG_PREFIX.EXPERTO_SMART} Analizando consulta táctica del CEO Trader...`);
 
     const promptContext = `Eres el Analista Senior (Smart Agent) del fondo. El CEO rápido (HFT) tiene una duda y necesita tu consejo profundo y analítico.
 Contexto de Mercado:
 ${marketContext}`;
 
     const response = await createChatCompletionWithRetry({
-      model: 'meta-llama/llama-3.3-70b-instruct',
-      fallbackModels: [
-        'qwen/qwen-2.5-72b-instruct',
-        'google/gemma-4-31b-it:free',
-        'z-ai/glm-5.2:free',
-        'openrouter/free'
-      ],
+      role: 'ANALYST',
       messages: [
         { role: 'system', content: promptContext },
         { role: 'user', content: `Consulta del CEO: ${params.duda}\nAnaliza la situación y dame una recomendación clara de sí/no o qué parámetros ajustar.` }
       ]
     });
 
-    console.log(`\${LOG_PREFIX.EXPERTO_SMART} Análisis finalizado. Entregando reporte...`);
+    console.log(`${LOG_PREFIX.EXPERTO_SMART} Análisis finalizado. Entregando reporte...`);
 
     return JSON.stringify({
       success: true,

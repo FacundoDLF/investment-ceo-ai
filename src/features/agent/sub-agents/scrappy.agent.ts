@@ -24,13 +24,13 @@ export async function runScrappyIteration() {
     if (currentScalpPosition) {
       if (currentScalpPosition.symbol !== symbol) {
         // El CEO cambió de activo, deberíamos cerrar el actual (Liquidación forzada).
-        currentScalpPosition = null; 
+        currentScalpPosition = null;
       } else {
         const exitPrice = currentScalpPosition.side === 'buy' ? priceData.bid : priceData.ask;
-        pnlPct = currentScalpPosition.side === 'buy' 
+        pnlPct = currentScalpPosition.side === 'buy'
           ? ((exitPrice - currentScalpPosition.entryPrice) / currentScalpPosition.entryPrice) * 100
           : ((currentScalpPosition.entryPrice - exitPrice) / currentScalpPosition.entryPrice) * 100;
-        
+
         // Log "Anormal" (ganancia o pérdida notable > 0.5%)
         if (Math.abs(pnlPct) >= 0.5) {
           const now = Date.now();
@@ -75,9 +75,9 @@ Reglas Críticas:
       model: 'meta-llama/llama-3.3-70b-instruct',
       fallbackModels: [
         'qwen/qwen-2.5-72b-instruct',
-        'meta-llama/llama-3.3-70b-instruct:free',
-        'nvidia/llama-3.1-nemotron-70b-instruct:free',
-        'qwen/qwen-2-72b-instruct:free'
+        'google/gemma-4-31b-it:free',
+        'z-ai/glm-5.2:free',
+        'openrouter/free'
       ],
       messages: [{ role: 'system', content: systemPrompt }],
       tools: [scalpTool],
@@ -91,22 +91,26 @@ Reglas Críticas:
         const args = JSON.parse(tc.function.arguments);
         const action = args.action;
 
-        // Logging visual amigable
+        // Logging visual amigable (Modo Perro de Caza)
         if (action === 'OPEN_LONG' || action === 'OPEN_SHORT') {
-           console.log(`\x1b[35m[Scrappy]\x1b[0m ⚡ Abriendo posición ${action === 'OPEN_LONG' ? 'LONG' : 'SHORT'} rápida en ${symbol} (Precio: $${midPrice.toFixed(2)})`);
+          console.log(`\x1b[35m[Scrappy]\x1b[0m ⚡ ¡Grrr! Atacó con un ${action === 'OPEN_LONG' ? 'LONG' : 'SHORT'} en ${symbol} a $${midPrice.toFixed(2)}`);
         } else if (action === 'CLOSE_POSITION') {
-           console.log(`\x1b[35m[Scrappy]\x1b[0m 💥 Cerrando posición en ${symbol} (PnL estimado: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%)`);
+          if (pnlPct > 0) {
+            console.log(`\x1b[35m[Scrappy]\x1b[0m 🥩 ¡Guau! Se escapó con ${symbol} (Premio: +${pnlPct.toFixed(2)}%)`);
+          } else {
+            console.log(`\x1b[35m[Scrappy]\x1b[0m 🐕‍🦺 ¡Yikes! Huyó de ${symbol} (Pérdida: ${pnlPct.toFixed(2)}%)`);
+          }
         } else {
-           const now = Date.now();
-           // Latido cada 30 segundos si está inactivo o holdeando
-           if (now - lastHeartbeatTime > 30000) {
-              if (currentScalpPosition) {
-                 console.log(`\x1b[35m[Scrappy]\x1b[0m 👀 Manteniendo ${currentScalpPosition.side.toUpperCase()} en ${symbol} | PnL actual: ${pnlPct > 0 ? '\x1b[32m+' : '\x1b[31m'}${pnlPct.toFixed(3)}%\x1b[0m`);
-              } else {
-                 console.log(`\x1b[35m[Scrappy]\x1b[0m ⏳ Buscando oportunidad de scalping en ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
-              }
-              lastHeartbeatTime = now;
-           }
+          const now = Date.now();
+          // Latido cada 30 segundos si está inactivo o holdeando
+          if (now - lastHeartbeatTime > 30000) {
+            if (currentScalpPosition) {
+              console.log(`\x1b[35m[Scrappy]\x1b[0m 🐺 Calculando recorrido del ${symbol} (${currentScalpPosition.side.toUpperCase()}) | Posición actual: ${pnlPct > 0 ? '\x1b[32m+' : '\x1b[31m'}${pnlPct.toFixed(3)}%\x1b[0m`);
+            } else {
+              console.log(`\x1b[35m[Scrappy]\x1b[0m 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
+            }
+            lastHeartbeatTime = now;
+          }
         }
 
         await executeScalpAction(action, symbol, config.budget, midPrice, pnlPct);
@@ -130,7 +134,7 @@ async function executeScalpAction(action: string, symbol: string, budget: number
         qty: currentScalpPosition.qty,
         type: 'market',
         category: 'linear'
-      }).catch(() => {}); // Ignorar errores de red para no frenar
+      }).catch(() => { }); // Ignorar errores de red para no frenar
 
       // Imprimir log solo si la ganancia/pérdida es anormal (> 0.5%)
       if (Math.abs(pnlPct) >= 0.5) {
@@ -153,7 +157,7 @@ async function executeScalpAction(action: string, symbol: string, budget: number
     if ((action === 'OPEN_LONG' || action === 'OPEN_SHORT') && !currentScalpPosition) {
       // Calcular cantidad de monedas según presupuesto
       let qty = budget / currentPrice;
-      
+
       // Normalizar qty para Bybit
       if (symbol === 'BTCUSDT') {
         qty = Math.floor(qty * 100000) / 100000;
@@ -173,7 +177,7 @@ async function executeScalpAction(action: string, symbol: string, budget: number
         qty: qty,
         type: 'market',
         category: 'linear'
-      }).catch(() => {}); // Fallo silencioso
+      }).catch(() => { }); // Fallo silencioso
 
       currentScalpPosition = {
         symbol,

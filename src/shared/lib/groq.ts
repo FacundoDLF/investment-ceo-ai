@@ -87,14 +87,29 @@ export async function createChatCompletionWithRetry(
     } catch (error: any) {
       const isRateLimit = error?.status === 429 || error?.status === 413;
       const isNetworkError = !error?.status || error?.status >= 500 || error?.name === 'APITimeoutError';
-      const isModelError = error?.status === 404 || error?.status === 403 || error?.status === 400 || error?.status === 402;
+
+      if (error?.status === 402) {
+        if (!currentModel.endsWith(':free')) {
+          console.warn(`\x1b[31m[API] Error 402 Payment Required en ${currentModel}. Cambiando a modelos gratuitos...\x1b[0m`);
+          // Marcar todos los modelos de pago como fallidos para no perder tiempo
+          for (const m of allModels) {
+            if (!m.endsWith(':free')) permanentlyFailedModels.add(m);
+          }
+          continue;
+        } else {
+          console.error(`\x1b[31m[API] Error 402 Payment Required en modelo gratuito ${currentModel}. Tu cuenta de OpenRouter está totalmente bloqueada. Abortando.\x1b[0m`);
+          throw new Error(`API Key bloqueada (402 Payment Required) al intentar usar modelo gratuito ${currentModel}.`);
+        }
+      }
+
+      const isModelError = error?.status === 404 || error?.status === 403 || error?.status === 400;
 
       if (isRateLimit) {
         let waitTimeMs = 0;
         const getHeader = (name: string) => {
           let val = typeof error?.headers?.get === 'function' ? error.headers.get(name) : error?.headers?.[name];
           if (!val) {
-             val = error?.error?.metadata?.headers?.[name] || error?.error?.metadata?.headers?.[name.replace(/(^\w|-\w)/g, (c) => c.toUpperCase())];
+            val = error?.error?.metadata?.headers?.[name] || error?.error?.metadata?.headers?.[name.replace(/(^\w|-\w)/g, (c) => c.toUpperCase())];
           }
           return val;
         };
@@ -104,13 +119,13 @@ export async function createChatCompletionWithRetry(
           const cleaned = retryAfterRaw.toString().replace(/ms/gi, '').replace(/s/gi, '').trim();
           const parsed = Number(cleaned);
           if (!Number.isNaN(parsed) && parsed > 0) {
-            if (parsed > 1577836800000) { 
+            if (parsed > 1577836800000) {
               const wait = parsed - Date.now();
               waitTimeMs = wait > 0 ? wait : 1000;
-            } else if (parsed > 1577836800) { 
+            } else if (parsed > 1577836800) {
               const wait = (parsed * 1000) - Date.now();
               waitTimeMs = wait > 0 ? wait : 1000;
-            } else { 
+            } else {
               waitTimeMs = parsed * 1000;
             }
           }
@@ -130,12 +145,12 @@ export async function createChatCompletionWithRetry(
         globalModelCooldowns.set(currentModel, Date.now() + waitTimeMs);
         console.warn(`\x1b[31m[Model Fallback]\x1b[0m RateLimit (429) en ${currentModel}. Cooldown: ${waitTimeMs}ms...`);
         continue;
-      } 
-      
+      }
+
       if (isNetworkError || isModelError) {
-        let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported/PaymentRequired (${error?.status})`;
+        let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported (${error?.status})`;
         console.warn(`\x1b[31m[Model Fallback]\x1b[0m ${errorType} en ${currentModel}. Descartado para esta solicitud...`);
-        
+
         // Log al postmortem
         try {
           const fs = require('fs');
@@ -146,7 +161,7 @@ export async function createChatCompletionWithRetry(
             error: error?.message,
             headers: error?.headers
           }, null, 2));
-        } catch (e) {}
+        } catch (e) { }
 
         permanentlyFailedModels.add(currentModel);
         continue;

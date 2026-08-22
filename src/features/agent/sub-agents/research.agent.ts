@@ -22,9 +22,9 @@ export async function runResearchAgent(query: string): Promise<string> {
     model: 'meta-llama/llama-3.3-70b-instruct',
     fallbackModels: [
       'qwen/qwen-2.5-72b-instruct',
-      'meta-llama/llama-3.3-70b-instruct:free',
-      'nvidia/llama-3.1-nemotron-70b-instruct:free',
-      'qwen/qwen-2-72b-instruct:free'
+      'google/gemma-4-31b-it:free',
+      'z-ai/glm-5.2:free',
+      'openrouter/free'
     ],
     messages,
     tools: [serperSearchTool, tavilyResearchTool],
@@ -92,9 +92,9 @@ export async function runResearchAgent(query: string): Promise<string> {
       model: 'meta-llama/llama-3.3-70b-instruct',
       fallbackModels: [
         'qwen/qwen-2.5-72b-instruct',
-        'meta-llama/llama-3.3-70b-instruct:free',
-        'nvidia/llama-3.1-nemotron-70b-instruct:free',
-        'qwen/qwen-2-72b-instruct:free'
+        'google/gemma-4-31b-it:free',
+        'z-ai/glm-5.2:free',
+        'openrouter/free'
       ],
       messages,
       tools: [serperSearchTool, tavilyResearchTool],

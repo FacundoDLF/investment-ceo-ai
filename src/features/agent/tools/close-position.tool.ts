@@ -6,7 +6,7 @@ import { prisma } from '@/shared/lib/prisma';
 export const closePositionSchema = z.object({
   venue: z.enum(['alpaca', 'bybit']).describe('Venue donde se encuentra la posición'),
   symbol: z.string().describe('Símbolo del activo a cerrar (ej. BTCUSDT)'),
-  percentage: z.number().min(1).max(100).describe('Porcentaje de la posición a cerrar (1-100). Usa 100 para cerrar todo.'),
+  percentage: z.coerce.number().min(1).max(100).describe('Porcentaje de la posición a cerrar (1-100). Usa 100 para cerrar todo.'),
   reason: z.string().max(300).describe('Breve justificación de por qué estás cerrando la posición (ej: Tesis fallida, Toma de ganancias)')
 });
 
@@ -74,7 +74,8 @@ export async function executeClosePosition(args: string): Promise<any> {
       side: side,
       qty: qtyToClose,
       type: 'market', // Siempre a mercado para asegurar el cierre
-      category: 'linear' // Asumimos futures para crypto por ahora
+      category: 'linear', // Asumimos futures para crypto por ahora
+      reduceOnly: true
     });
 
     // Registrar en ExecutionLog local

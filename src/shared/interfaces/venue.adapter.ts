@@ -15,6 +15,7 @@ export interface OrderParams {
   limitPrice?: number;
   stopLoss?: number;
   takeProfit?: number;
+  reduceOnly?: boolean;
 }
 
 export interface Position {

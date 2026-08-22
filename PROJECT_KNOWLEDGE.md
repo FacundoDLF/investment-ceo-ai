@@ -17,6 +17,14 @@
   **Además, se priorizaron modelos como `meta-llama/llama-3.3-70b-instruct` y `qwen/qwen-2.5-72b-instruct`** que SÍ sabemos que devuelven Status 200 en el Proxy actual.
 * **REGLA:** El enrutamiento es automático basándose en el nombre del modelo. **Si el modelo tiene una barra diagonal `/` (ej: `meta-llama/...`), viaja por OpenRouter. Si no la tiene, viaja por Groq nativo.** NUNCA cambies esta lógica sin una razón justificada. Y si usas un Proxy, verifica con un script (`list_models.ts` o fetch) que el modelo realmente exista antes de codearlo duro.
 
+### [ISSUE] ModelNotFound/Unsupported (400/404) por Modelos Deprecados en Groq
+* **Contexto:** Groq y otras APIs actualizan o deprecian modelos frecuentemente (ej. `gemma2-9b-it` deprecado, `llama3-8b-8192` removido en algunos endpoints).
+* **Problema:** El sistema reintentaba infinitamente (o escupía errores en loop en Daemons HFT como Scrappy) porque los IDs de los modelos ya no existían o devolvían Error 400 Bad Request.
+* **Solución:**
+  1. Se configuró `groq.ts` para capturar errores 400/404 y registrar el fallo en `error_postmortem.json` para facilitar la depuración, y añadir el modelo a un `permanentlyFailedModels` Set, impidiendo que bloquee futuros ciclos en Daemons HFT.
+  2. Para evitar crasheos completos, se actualizó la lista de fallbacks en los agentes utilizando modelos que se verificó que existen en el endpoint actual mediante el script `list_models.ts`.
+* **REGLA:** Siempre incluye múltiples `fallbackModels` en llamadas críticas (`createChatCompletionWithRetry`) y, si hay un fallo masivo de modelos, verifica inmediatamente el endpoint usando el script de listar modelos para ver la nueva oferta real.
+
 ### [DECISIÓN] Consulta a Modelos "Smart" (Consult Analyst Tool)
 * **Contexto:** Llama 70B en Groq es ultra rápido (ideal para High Frequency Trading), pero a veces carece del razonamiento profundo.
 * **Solución:** Se creó la herramienta `consult_smart_analyst`. Llama 70B tiene permiso para invocarla si el mercado es ambiguo. Esto envía el contexto por debajo a OpenRouter y le devuelve el consejo estratégico a Llama.
@@ -30,6 +38,12 @@
 * **Problema:** Bybit rechaza cantidades con excesivos decimales para criptomonedas específicas (ETH suele requerir saltos de lote de `0.01`).
 * **Solución:** En `src/features/agent/tools/execute-trade.tool.ts`, justo antes de enviar la orden, se implementó una normalización del `qty` (`Math.floor`). Para BTC se trunca a 3 decimales, para ETH a 2, y para otros a números enteros. 
 * **REGLA:** NUNCA envíes un `qty` en crudo devuelto por el Risk Engine al broker sin pasarlo por la normalización de lotes.
+
+### [ISSUE] Bybit API Error: ab not enough for new order (Hedge Mode Close)
+* **Contexto:** El CEO intentaba cerrar una posición Long perdedora durante el MODO DAMAGE CONTROL.
+* **Problema:** En el Hedge Mode de Bybit, para cerrar una posición no basta con enviar una orden contraria; Bybit cree que quieres ABRIR una nueva posición en la dirección opuesta (y falla si no tienes saldo libre).
+* **Solución:** En `bybit.adapter.ts` y en `close-position.tool.ts` se implementó explícitamente el uso de la bandera `reduceOnly: true`. Además, la lógica del `positionIdx` en el adapter se invirtió para cierres: al cerrar un Long (vendiendo con reduceOnly), debes enviar `positionIdx = 1`. Al cerrar un Short (comprando con reduceOnly), debes enviar `positionIdx = 2`.
+* **REGLA:** Siempre que diseñes herramientas o adapters para CERRAR posiciones en Hedge Mode, DEBES incluir `reduceOnly: true` en la carga útil y cruzar la orden apuntando al `positionIdx` de la posición original que intentas reducir.
 
 ### [ISSUE] Bybit API Error: Insufficient balance en Órdenes SPOT
 * **Contexto:** El CEO Agent intentaba comprar BTCUSDT enviando una orden `category: "spot"`.

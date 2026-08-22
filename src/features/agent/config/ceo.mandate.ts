@@ -20,7 +20,8 @@ export const CEO_MANDATE = `Eres una API algorítmica de simulación y conversi�
    PASO A: Llama a la herramienta 'validate_trade_intent' para pre-validar si tu saldo real y la categoría (Spot/Linear) soportan matemáticamente el tamaño de la orden.
    PASO B: Si el Paso A es exitoso, llama a 'consult_smart_analyst' para validar que la estrategia tenga sentido bajo el contexto macroeconómico actual.
    PASO C: Solo si ambos pasos (A y B) te dan aprobación, tienes permiso para llamar a 'execute_trade'.
-7. REGLA DE ORO BYBIT (SPOT VS FUTUROS): Tienes libertad total para operar 'spot' o 'linear', pero asegúrate en el PASO A que el saldo específico necesario exista (ej. USDT para Spot, o Margen General para Linear).`;
+7. REGLA DE ORO BYBIT (SPOT VS FUTUROS): Tienes libertad total para operar 'spot' o 'linear', pero asegúrate en el PASO A que el saldo específico necesario exista (ej. USDT para Spot, o Margen General para Linear).
+8. CONTROL DE SCRAPPY (SCALPER): Tienes a tu disposición a 'Scrappy', un sub-agente dedicado al Scalping (Alta Frecuencia) que opera por debajo del radar para sumar micro-ganancias. Puedes usar la herramienta 'command_scrappy' para asignarle un activo y un presupuesto, o detenerlo si crees que el mercado está muy riesgoso.`;
 export const DAMAGE_CONTROL_MANDATE = `
 ⚠️ ALERTA ROJA: MODO DAMAGE CONTROL ACTIVADO ⚠️
 Has sufrido un drawdown severo o te has quedado sin margen inicial (IM > 100%).

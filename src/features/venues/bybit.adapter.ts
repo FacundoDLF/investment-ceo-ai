@@ -113,8 +113,9 @@ export class BybitAdapter implements IVenueAdapter {
       symbol: params.symbol,
       side: params.side === 'buy' ? 'Buy' : 'Sell',
       orderType: params.type === 'market' ? 'Market' : 'Limit',
-      // Redondear a 3 decimales para evitar Qty invalid en BTC/ETH
-      qty: parseFloat(params.qty.toFixed(3)).toString(),
+      qty: params.qty.toString(),
+      reduceOnly: params.reduceOnly || false,
+      timeInForce: 'GTC',
     };
 
     if (params.type === 'limit' && params.limitPrice) {
@@ -178,10 +179,16 @@ export class BybitAdapter implements IVenueAdapter {
 
     let json = await sendOrderRequest(payload);
 
-    // Si falla por Hedge Mode, reintentamos asumiendo que abrimos posición
+    // Si falla por Hedge Mode, reintentamos asumiendo la posición correcta
     if (json.retCode !== 0 && json.retMsg.includes('position idx not match position mode') && payload.category === 'linear') {
-      console.log('🔄 Detectado Hedge Mode en Bybit. Reintentando orden con positionIdx = 1 (Buy) o 2 (Sell)...');
-      payload.positionIdx = params.side === 'buy' ? 1 : 2;
+      console.log('🔄 Detectado Hedge Mode en Bybit. Ajustando positionIdx...');
+      if (params.reduceOnly) {
+        // Al cerrar (reduceOnly), si vendemos estamos cerrando un Long (idx 1). Si compramos cerramos Short (idx 2).
+        payload.positionIdx = params.side === 'sell' ? 1 : 2;
+      } else {
+        // Al abrir, si compramos abrimos Long (idx 1). Si vendemos abrimos Short (idx 2).
+        payload.positionIdx = params.side === 'buy' ? 1 : 2;
+      }
       json = await sendOrderRequest(payload);
     }
 

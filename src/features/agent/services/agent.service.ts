@@ -5,6 +5,7 @@ import { switchAssetTool, executeSwitchAsset } from '@/features/agent/tools/swit
 import { consultAnalystTool, executeConsultAnalyst } from '@/features/agent/tools/consult-analyst.tool';
 import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/agent/tools/validate-trade-intent.tool';
 import { closePositionTool, executeClosePosition } from '@/features/agent/tools/close-position.tool';
+import { commandScrappyTool, executeCommandScrappy } from '@/features/agent/tools/command-scrappy.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
@@ -14,7 +15,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     promptContext += `\n\n**Contexto de Mercado y Sub-Agentes:**\n${marketContext}`;
   }
   
-  promptContext += `\n\nPIENSA EN VOZ ALTA (Chain of Thought): Antes de usar una herramienta, usa libremente tu respuesta (el campo content) para razonar exhaustivamente. Piensa paso a paso. REGLA OBLIGATORIA: Al FINALIZAR tu razonamiento, DEBES resumir tu pensamiento agregando un título de máximo 4 palabras entre corchetes al final de tu texto, por ejemplo [TÍTULO: Analizando Volatilidad] o [TÍTULO: Buscando Entradas].`;
+  promptContext += `\n\nPIENSA EN VOZ ALTA (Chain of Thought): Antes de usar una herramienta, usa libremente tu respuesta (el campo content) para razonar exhaustivamente. Piensa paso a paso. REGLA OBLIGATORIA: Al FINALIZAR tu razonamiento, DEBES resumir tu pensamiento agregando un título de máximo 6 palabras entre corchetes al final de tu texto. IMPORTANTE: Si estás en MODO PORTFOLIO_AUDIT o DAMAGE_CONTROL y decides NO ejecutar ninguna acción (es decir, todo está bien o decides esperar), tu título DEBE indicar el estado de salud claramente, por ejemplo [TÍTULO: Salud OK - Hold] o [TÍTULO: Auditoría Limpia].`;
 
   const messages: ChatCompletionMessageParam[] = [
     { role: 'system', content: promptContext },
@@ -37,7 +38,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           'qwen/qwen-2.5-72b-instruct'
         ],
         messages: currentMessages,
-        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool],
+        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool],
       });
     } catch (error: any) {
       if (error.status === 400 && error.message?.includes('tool call validation failed')) {
@@ -102,6 +103,8 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           result = await executeConsultAnalyst(toolCall.function.arguments, marketContext || '');
         } else if (toolCall.function.name === 'close_position') {
           result = await executeClosePosition(toolCall.function.arguments);
+        } else if (toolCall.function.name === 'command_scrappy') {
+          result = await executeCommandScrappy(toolCall.function.arguments);
         }
 
         let displayResult = result;

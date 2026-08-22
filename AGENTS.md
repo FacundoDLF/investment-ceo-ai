@@ -14,3 +14,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 MANDATORY: Cada vez que inicies un trabajo, respondas a un prompt o propongas algo, DEBES empezar tu primera respuesta indicando explícitamente que has leído y revisado el archivo `PROJECT_KNOWLEDGE.md` y que estás listo para comenzar. NUNCA propongas o modifiques código sin antes cumplir con esta directiva.
 
 **Queda terminantemente PROHIBIDO omitir este archivo y volver a cometer errores que ya hayan sido registrados en la bitácora.**
+
+## 2. ACTUALIZACIÓN AUTOMÁTICA DE LA BITÁCORA (POST-MORTEM)
+MANDATORY: Cada vez que enfrentemos un bug, error de API (como los 400/404 de Groq) o descubramos una regla de negocio oculta (como el Hedge Mode de Bybit), DEBES actualizar INMEDIATAMENTE el archivo `PROJECT_KNOWLEDGE.md` agregando el nuevo issue y su solución. 
+**PROHIBICIÓN:** NUNCA debes esperar a que el usuario te pida que actualices la bitácora. Debes hacerlo de forma proactiva y automática como parte final de la resolución de cualquier problema.

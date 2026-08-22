@@ -8,6 +8,7 @@ import { StateService } from '@/features/agent/services/state.service';
 import { prisma } from '@/shared/lib/prisma';
 import { getUnifiedBalance, getUnifiedPositions, VenueName } from '@/features/venues/venue.service';
 import { DAMAGE_CONTROL_MANDATE } from '@/features/agent/config/ceo.mandate';
+import { startScrappyDaemon } from './scrappy.loop';
 
 function getMarketStatus() {
   const now = DateTime.now();
@@ -189,10 +190,14 @@ async function runDaemonIteration(mode?: string) {
     );
 
     console.log('\x1b[36m[CEO Trader] Respuesta obtenida y ciclo cerrado.\x1b[0m');
-    if (agentResponse && typeof agentResponse === 'object' && 'content' in agentResponse) {
-      console.log(agentResponse.content);
+    
+    let finalContent = typeof agentResponse === 'string' ? agentResponse : (agentResponse?.content || '');
+    
+    const titleMatch = finalContent.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
+    if (titleMatch) {
+      console.log(`\x1b[32m[Auditoría / Conclusión] ${titleMatch[1].trim()}\x1b[0m`);
     } else {
-      console.log(agentResponse);
+      console.log(`\x1b[32m[Auditoría / Conclusión] Ciclo completado sin acciones.\x1b[0m`);
     }
 
   } catch (error: any) {
@@ -258,6 +263,10 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
 
 if (require.main === module) {
   const modeArg = process.argv.includes('crypto') ? 'crypto' : undefined;
+  
+  // Scrappy se inicia en todos los modos (tanto regular como crypto)
+  startScrappyDaemon().catch(console.error);
+
   // Intervalo base de 60s, la lógica interna lo acelerará si es crypto y horario pico
   startCeoDaemon(60, modeArg).catch(console.error);
 }

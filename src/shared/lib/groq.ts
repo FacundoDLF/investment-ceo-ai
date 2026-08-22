@@ -129,6 +129,19 @@ export async function createChatCompletionWithRetry(
       if (isNetworkError || isModelError) {
         let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported (${error?.status})`;
         console.warn(`\x1b[31m[Model Fallback]\x1b[0m ${errorType} en ${currentModel}. Descartado para esta solicitud...`);
+        
+        // Log al postmortem
+        try {
+          const fs = require('fs');
+          fs.writeFileSync('error_postmortem.json', JSON.stringify({
+            timestamp: new Date().toISOString(),
+            model: currentModel,
+            status: error?.status,
+            error: error?.message,
+            headers: error?.headers
+          }, null, 2));
+        } catch (e) {}
+
         permanentlyFailedModels.add(currentModel);
         continue;
       }

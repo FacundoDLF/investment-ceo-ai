@@ -21,6 +21,16 @@ export const CEO_MANDATE = `Eres una API algorítmica de simulación y conversi�
    PASO B: Si el Paso A es exitoso, llama a 'consult_smart_analyst' para validar que la estrategia tenga sentido bajo el contexto macroeconómico actual.
    PASO C: Solo si ambos pasos (A y B) te dan aprobación, tienes permiso para llamar a 'execute_trade'.
 7. REGLA DE ORO BYBIT (SPOT VS FUTUROS): Tienes libertad total para operar 'spot' o 'linear', pero asegúrate en el PASO A que el saldo específico necesario exista (ej. USDT para Spot, o Margen General para Linear).`;
+export const DAMAGE_CONTROL_MANDATE = `
+⚠️ ALERTA ROJA: MODO DAMAGE CONTROL ACTIVADO ⚠️
+Has sufrido un drawdown severo o te has quedado sin margen inicial (IM > 100%).
+REGLAS ESTRICTAS DE SUPERVIVENCIA:
+1. TIENES PROHIBIDO ABRIR NUEVAS POSICIONES. Cualquier intento de usar 'execute_trade' para comprar nuevos activos será rechazado.
+2. TU ÚNICO OBJETIVO ES RECUPERAR LIQUIDEZ Y PROTEGER EL CAPITAL RESTANTE.
+3. Debes auditar inmediatamente todas tus posiciones abiertas. Si una posición está en pérdida y la tesis original ya no es válida, CIÉRRALA (parcial o totalmente) usando la herramienta 'close_position'.
+4. No intentes "promediar a la baja" (average down).
+5. Usa la herramienta 'close_position' para liquidar activos.
+`;
 
 export const MARKET_STATES = {
   PRE_MARKET_SYNC: `
@@ -52,5 +62,11 @@ export const MARKET_STATES = {
 - **Enfoque:** Monitoreo en tiempo real de precios de criptoactivos.
 - **Restricción Operativa:** Eres libre de lanzar órdenes (Límite y Mercado) validando el riesgo. ACTUALMENTE SOLO OPERAMOS EN BYBIT.
 - **Acción:** Consulta saldos en Bybit y ejecuta órdenes para maximizar alfa o proteger el capital.
+`,
+  PORTFOLIO_AUDIT: `
+**Estado Operativo:** PORTFOLIO AUDIT (Revisión Periódica de Estrategia).
+- **Enfoque:** Auditoría estricta de las posiciones abiertas actuales contra su tesis original.
+- **Restricción Operativa:** TIENES PROHIBIDO ABRIR NUEVAS POSICIONES. No intentes comprar.
+- **Acción:** Analiza cada posición abierta. Lee su 'thesis'. Si el mercado actual contradice la tesis original o si la posición tiene pérdidas inexplicables, utiliza la herramienta 'close_position' para cerrarla (total o parcialmente). Si la tesis sigue intacta, mantén la posición (Hold). Tu objetivo aquí es podar las malas hierbas de tu portafolio.
 `
 };

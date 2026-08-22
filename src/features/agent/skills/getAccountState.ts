@@ -15,7 +15,7 @@ export const getAccountStateTool: ChatCompletionTool = {
 };
 
 export async function executeGetAccountState() {
-  const [alpacaBalance, bybitBalance, challenges, alpacaPositions, bybitPositions, dbPositions] = await Promise.all([
+  const [alpacaBalance, bybitBalance, challenges, alpacaPositions, bybitPositions, dbPositions, lastSnapshot] = await Promise.all([
     getUnifiedBalance('alpaca').catch((e) => {
       console.warn('Error obteniendo balance de Alpaca:', e.message);
       return null;
@@ -41,19 +41,23 @@ export async function executeGetAccountState() {
       console.warn('Error obteniendo posiciones de Bybit:', e.message);
       return [];
     }),
-    prisma.position.findMany() // Obtener estrategias guardadas
+    prisma.position.findMany(), // Obtener estrategias guardadas
+    prisma.performanceSnapshot.findFirst({ orderBy: { timestamp: 'desc' } })
   ]);
 
   const totalCash = (alpacaBalance?.cash ?? 0) + (bybitBalance?.cash ?? 0);
 
   // Mapear estrategias a posiciones vivas
-  const getStrategy = (venue: string, symbol: string) => {
+  const getPositionMeta = (venue: string, symbol: string) => {
     const saved = dbPositions?.find((p) => p.venue === venue && p.symbol === symbol);
-    return saved?.strategy || 'LONG_TERM'; // Por defecto LONG_TERM
+    return {
+      strategy: saved?.strategy || 'LONG_TERM',
+      thesis: saved?.thesis || 'No hay tesis registrada.'
+    };
   };
 
-  const enrichedAlpaca = alpacaPositions.map(p => ({ ...p, strategy: getStrategy('alpaca', p.symbol) }));
-  const enrichedBybit = bybitPositions.map(p => ({ ...p, strategy: getStrategy('bybit', p.symbol) }));
+  const enrichedAlpaca = alpacaPositions.map(p => ({ ...p, ...getPositionMeta('alpaca', p.symbol) }));
+  const enrichedBybit = bybitPositions.map(p => ({ ...p, ...getPositionMeta('bybit', p.symbol) }));
 
   return {
     consolidatedBalance: {
@@ -66,5 +70,6 @@ export async function executeGetAccountState() {
       bybit: enrichedBybit,
     },
     challenges,
+    scorecard: lastSnapshot
   };
 }

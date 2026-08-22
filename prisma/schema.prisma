@@ -67,8 +67,17 @@ model Position {
   venue     String       // e.g. "alpaca", "bybit"
   symbol    String       // e.g. "AAPL", "BTCUSDT"
   strategy  StrategyType @default(LONG_TERM)
+  thesis    String?      @db.Text // Tesis de inversión para el self-reflection
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
   @@unique([venue, symbol])
+}
+
+model PerformanceSnapshot {
+  id             String   @id @default(uuid())
+  timestamp      DateTime @default(now())
+  totalEquity    Float
+  unrealizedPnL  Float
+  notes          String?
 }

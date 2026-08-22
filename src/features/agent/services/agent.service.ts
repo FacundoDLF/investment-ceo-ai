@@ -4,6 +4,7 @@ import { executeTradeTool, executeExecuteTrade } from '@/features/agent/tools/ex
 import { switchAssetTool, executeSwitchAsset } from '@/features/agent/tools/switch-asset.tool';
 import { consultAnalystTool, executeConsultAnalyst } from '@/features/agent/tools/consult-analyst.tool';
 import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/agent/tools/validate-trade-intent.tool';
+import { closePositionTool, executeClosePosition } from '@/features/agent/tools/close-position.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
@@ -13,7 +14,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     promptContext += `\n\n**Contexto de Mercado y Sub-Agentes:**\n${marketContext}`;
   }
   
-  promptContext += `\n\nREGLA ESTRICTA DE CONSOLA: Al explicar tu razonamiento (en el campo content), DEBES ser extremadamente breve y telegráfico. Usa el formato "Label: Value". MÁXIMO 2 o 3 renglones. NUNCA uses tablas, ni formato largo, ni explicaciones largas. Ejemplo válido:\nEstado: Buscando oportunidad\nRiesgo: Alto\nAcción: Ninguna`;
+  promptContext += `\n\nPIENSA EN VOZ ALTA (Chain of Thought): Antes de usar una herramienta, usa libremente tu respuesta (el campo content) para razonar exhaustivamente. Piensa paso a paso. REGLA OBLIGATORIA: Al FINALIZAR tu razonamiento, DEBES resumir tu pensamiento agregando un título de máximo 4 palabras entre corchetes al final de tu texto, por ejemplo [TÍTULO: Analizando Volatilidad] o [TÍTULO: Buscando Entradas].`;
 
   const messages: ChatCompletionMessageParam[] = [
     { role: 'system', content: promptContext },
@@ -36,7 +37,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           'qwen/qwen-2.5-72b-instruct'
         ],
         messages: currentMessages,
-        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool],
+        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool],
       });
     } catch (error: any) {
       if (error.status === 400 && error.message?.includes('tool call validation failed')) {
@@ -75,7 +76,10 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     }
 
     if (responseMessage?.content) {
-      console.log(`\n\x1b[36m[CEO Trader] Razonamiento:\x1b[0m\n${responseMessage.content}\n`);
+      const contentStr = responseMessage.content.trim();
+      const titleMatch = contentStr.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
+      const displayContent = titleMatch ? titleMatch[1].trim() + '...' : 'Procesando estrategia...';
+      console.log(`\n\x1b[36m[CEO Trader] Razonando:\x1b[0m ${displayContent} \x1b[90m(pensamiento oculto)\x1b[0m`);
     }
 
     currentMessages.push(responseMessage as ChatCompletionMessageParam);
@@ -96,6 +100,8 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           result = await executeSwitchAsset(toolCall.function.arguments);
         } else if (toolCall.function.name === 'consult_smart_analyst') {
           result = await executeConsultAnalyst(toolCall.function.arguments, marketContext || '');
+        } else if (toolCall.function.name === 'close_position') {
+          result = await executeClosePosition(toolCall.function.arguments);
         }
 
         let displayResult = result;

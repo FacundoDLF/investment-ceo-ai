@@ -6,7 +6,8 @@ import { runQuantAgent } from '@/features/agent/sub-agents/quant.agent';
 import { runMarketScanner } from '@/features/agent/sub-agents/market-scanner.agent';
 import { StateService } from '@/features/agent/services/state.service';
 import { prisma } from '@/shared/lib/prisma';
-import { getUnifiedBalance, VenueName } from '@/features/venues/venue.service';
+import { getUnifiedBalance, getUnifiedPositions, VenueName } from '@/features/venues/venue.service';
+import { DAMAGE_CONTROL_MANDATE } from '@/features/agent/config/ceo.mandate';
 
 function getMarketStatus() {
   const now = DateTime.now();
@@ -46,8 +47,11 @@ let cachedResearchReport = "Aún no hay reporte macroeconómico.";
 let lastScannerTime = 0;
 let cachedScannerReport = "Aún no hay reporte del escáner de mercado.";
 
+let iterationCount = 0;
+
 async function runDaemonIteration(mode?: string) {
-  console.log(`\n\x1b[33m[Sistema]\x1b[0m Iniciando iteración del CEO Trader (Modo: ${mode || 'Normal'})...`);
+  iterationCount++;
+  console.log(`\n\x1b[33m[Sistema]\x1b[0m Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'})...`);
 
   try {
     const venue: VenueName = mode === 'crypto' ? 'bybit' : 'alpaca';
@@ -59,8 +63,36 @@ async function runDaemonIteration(mode?: string) {
 
     let currentState: string;
     let marketContext: string;
+    let isDamageControl = false;
 
-    if (mode === 'crypto') {
+    // Calcular Unrealized PnL
+    const positions = await getUnifiedPositions(venue).catch(() => []);
+    const totalUnrealizedPnL = positions.reduce((sum, p) => sum + (p.unrealizedPl || 0), 0);
+    const pnlPercentage = balance.cash > 0 ? totalUnrealizedPnL / balance.cash : 0;
+
+    // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
+    if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= -0.05) {
+      isDamageControl = true;
+      console.log(`\x1b[31m[Sistema] ⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})\x1b[0m`);
+    }
+
+    // Registrar Snapshot en BD
+    await prisma.performanceSnapshot.create({
+      data: {
+        totalEquity: balance.cash,
+        unrealizedPnL: totalUnrealizedPnL,
+        notes: `Iteración #${iterationCount} - Estado: ${isDamageControl ? 'DAMAGE_CONTROL' : (iterationCount % 5 === 0 ? 'AUDIT' : 'NORMAL')}`
+      }
+    });
+
+    if (isDamageControl) {
+      currentState = 'DAMAGE_CONTROL';
+      marketContext = DAMAGE_CONTROL_MANDATE;
+    } else if (iterationCount % 5 === 0) {
+      currentState = 'PORTFOLIO_AUDIT';
+      marketContext = MARKET_STATES.PORTFOLIO_AUDIT;
+      console.log(`\x1b[35m[Sistema] 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})\x1b[0m`);
+    } else if (mode === 'crypto') {
       currentState = 'CRYPTO_ALWAYS_OPEN';
       marketContext = MARKET_STATES.CRYPTO_ALWAYS_OPEN;
     } else {
@@ -145,8 +177,14 @@ async function runDaemonIteration(mode?: string) {
       marketContext += `\n\n**Reporte del Market Scanner (Oportunidades):**\n${cachedScannerReport}`;
     }
 
+    const agentPrompt = isDamageControl 
+      ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES.`
+      : (currentState === 'PORTFOLIO_AUDIT' 
+        ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS.`
+        : `Analiza los reportes de tus sub-agentes, el estado del mercado actual y ejecuta operaciones segundo a segundo si encuentras una oportunidad clara según tu Risk Engine. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio. En modo crypto, operas 24/7 sin descanso.`);
+
     const agentResponse = await runAgentCycle(
-      `Analiza los reportes de tus sub-agentes, el estado del mercado actual y ejecuta operaciones segundo a segundo si encuentras una oportunidad clara según tu Risk Engine. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio. En modo crypto, operas 24/7 sin descanso.`,
+      agentPrompt,
       marketContext
     );
 

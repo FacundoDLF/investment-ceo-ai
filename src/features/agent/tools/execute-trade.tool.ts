@@ -12,6 +12,7 @@ export const executeTradeSchema = z.object({
   takeProfit: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio de Take Profit para orden OCO'),
   category: z.enum(['spot', 'linear']).optional().describe('Categoría de mercado (spot o linear/futuros). Por defecto linear.'),
   strategy: z.enum(['LONG_TERM', 'INTRADAY']).describe('Estrategia de la operación'),
+  thesis: z.string().max(300).describe('Breve tesis de inversión justificando este trade (Obligatorio para la auditoría de portafolio)'),
 });
 
 export const executeTradeTool = {
@@ -32,8 +33,9 @@ export const executeTradeTool = {
         takeProfit: { type: ['number', 'null', 'string'] },
         category: { type: 'string', enum: ['spot', 'linear'] },
         strategy: { type: 'string', enum: ['LONG_TERM', 'INTRADAY'] },
+        thesis: { type: 'string', maxLength: 300 },
       },
-      required: ['venue', 'symbol', 'side', 'qty', 'type', 'strategy'],
+      required: ['venue', 'symbol', 'side', 'qty', 'type', 'strategy', 'thesis'],
     },
   },
 };
@@ -125,11 +127,12 @@ export async function executeExecuteTrade(args: string) {
             symbol: params.symbol
           }
         },
-        update: { strategy: params.strategy },
+        update: { strategy: params.strategy, thesis: params.thesis },
         create: {
           venue: params.venue,
           symbol: params.symbol,
-          strategy: params.strategy
+          strategy: params.strategy,
+          thesis: params.thesis
         }
       });
     }

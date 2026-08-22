@@ -35,7 +35,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     { role: 'user', content: `Analiza la viabilidad cuantitativa para el activo: ${asset}` }
   ];
 
-  console.log('\x1b[35m[Rick Queen]\x1b[0m Iniciando análisis cuantitativo para:', asset);
+  console.log(`\${LOG_PREFIX.RICK_QUEEN} Iniciando análisis cuantitativo para:`, asset);
 
   const tools: ChatCompletionTool[] = [
     getVenueBalanceTool,
@@ -82,7 +82,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\x1b[35m[Rick Queen]\x1b[0m ${getFriendlyToolName(toolCall.function.name)}`);
+      console.log(`\${ANSI_COLORS.MAGENTA}[Rick Queen]\${ANSI_COLORS.RESET} ${getFriendlyToolName(toolCall.function.name)}`);
       let toolResult = '';
       
       try {

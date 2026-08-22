@@ -1,0 +1,11 @@
+export const SYSTEM_INTERVALS = {
+  CEO_BASE_SEC: 60,
+  CEO_PEAK_SEC: 5,
+  RESEARCH_MS: 3600000, // 1 hora
+  SCANNER_MS: 900000,   // 15 minutos
+};
+
+export const SYSTEM_THRESHOLDS = {
+  DAMAGE_CONTROL_PNL: -0.05,
+  MIN_CAPITAL_REQUIRED: 10,
+};

@@ -25,7 +25,7 @@ export async function executeConsultAnalyst(args: string, marketContext: string)
     const parsedArgs = JSON.parse(args);
     const params = consultAnalystSchema.parse(parsedArgs);
 
-    console.log('\x1b[35m[Experto S.M.A.R.T]\x1b[0m Analizando consulta táctica del CEO Trader...');
+    console.log(`\${LOG_PREFIX.EXPERTO_SMART} Analizando consulta táctica del CEO Trader...`);
 
     const promptContext = `Eres el Analista Senior (Smart Agent) del fondo. El CEO rápido (HFT) tiene una duda y necesita tu consejo profundo y analítico.
 Contexto de Mercado:
@@ -45,7 +45,7 @@ ${marketContext}`;
       ]
     });
 
-    console.log('\x1b[35m[Experto S.M.A.R.T]\x1b[0m Análisis finalizado. Entregando reporte...');
+    console.log(`\${LOG_PREFIX.EXPERTO_SMART} Análisis finalizado. Entregando reporte...`);
 
     return JSON.stringify({
       success: true,

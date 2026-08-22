@@ -16,7 +16,7 @@ export async function runResearchAgent(query: string): Promise<string> {
     { role: 'user', content: query }
   ];
 
-  console.log('\x1b[35m[Richard Newman]\x1b[0m Iniciando investigación sobre:', query);
+  console.log(`\${LOG_PREFIX.RICHARD_NEWMAN} Iniciando investigación sobre:`, query);
 
   let response = await createChatCompletionWithRetry({
     model: 'meta-llama/llama-3.3-70b-instruct',
@@ -57,18 +57,18 @@ export async function runResearchAgent(query: string): Promise<string> {
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\x1b[35m[Richard Newman]\x1b[0m ${getFriendlyToolName(toolCall.function.name)}`);
+      console.log(`\${ANSI_COLORS.MAGENTA}[Richard Newman]\${ANSI_COLORS.RESET} ${getFriendlyToolName(toolCall.function.name)}`);
       let toolResult = '';
       
       try {
         if (toolCall.function.name === 'serper_search') {
-          console.log('\x1b[35m[Richard Newman]\x1b[0m Informando...');
+          console.log(`\${LOG_PREFIX.RICHARD_NEWMAN} Informando...`);
           const result = await executeSerperSearch(toolCall.function.arguments);
           toolResult = JSON.stringify(result);
           try {
              const q = JSON.parse(toolCall.function.arguments).query || "Búsqueda web";
              const shortQuery = q.split(' ').slice(0, 3).join(' ');
-             console.log(`\x1b[35m[Richard Newman]\x1b[0m CEO Informado. Tema: ${shortQuery}`);
+             console.log(`\${ANSI_COLORS.MAGENTA}[Richard Newman]\${ANSI_COLORS.RESET} CEO Informado. Tema: ${shortQuery}`);
           } catch(e) {}
         } else if (toolCall.function.name === 'tavily_research') {
           const result = await executeTavilyResearch(toolCall.function.arguments);
@@ -77,7 +77,7 @@ export async function runResearchAgent(query: string): Promise<string> {
           toolResult = `Herramienta desconocida: ${toolCall.function.name}`;
         }
       } catch (error: any) {
-        console.error('\x1b[31m[Richard Newman] Error crítico:\x1b[0m', error.message);
+        console.error(`\${LOG_PREFIX.SISTEMA_CRITICO} [Richard Newman] Error crítico:\${ANSI_COLORS.RESET}`, error.message);
         throw error;
       }
       
@@ -107,7 +107,7 @@ export async function runResearchAgent(query: string): Promise<string> {
   if (finalReport) {
     // Tomamos solo la primera oración para mostrar en consola como resumen
     const firstSentence = finalReport.split('.')[0] + '.';
-    console.log(`\x1b[35m[Richard Newman]\x1b[0m Resumen de investigación: ${firstSentence}`);
+    console.log(`\${ANSI_COLORS.MAGENTA}[Richard Newman]\${ANSI_COLORS.RESET} Resumen de investigación: ${firstSentence}`);
   }
   return finalReport;
 }

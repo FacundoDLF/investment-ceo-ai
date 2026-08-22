@@ -46,7 +46,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       });
     } catch (error: any) {
       if (error.status === 400 && error.message?.includes('tool call validation failed')) {
-        console.warn('\x1b[31m[Sistema] Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...\x1b[0m');
+        console.warn('\${LOG_PREFIX.SISTEMA_CRITICO} Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...\${ANSI_COLORS.RESET}');
         currentMessages.push({
           role: 'user',
           content: 'Tu última llamada a herramienta fue rechazada por el servidor porque usaste un nombre inválido (ej: agregaste <|channel|>) o violaste el esquema JSON. Responde con el nombre de herramienta y formato exacto requerido.'
@@ -84,7 +84,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       const contentStr = responseMessage.content.trim();
       const titleMatch = contentStr.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
       const displayContent = titleMatch ? titleMatch[1].trim() + '...' : 'Procesando estrategia...';
-      console.log(`\n\x1b[36m[CEO Trader] Razonando:\x1b[0m ${displayContent} \x1b[90m(pensamiento oculto)\x1b[0m`);
+      console.log(`\n\${LOG_PREFIX.CEO_TRADER} Razonando:\${ANSI_COLORS.RESET} ${displayContent} \x1b[90m(pensamiento oculto)\${ANSI_COLORS.RESET}`);
     }
 
     currentMessages.push(responseMessage as ChatCompletionMessageParam);
@@ -92,7 +92,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
       for (const toolCall of responseMessage.tool_calls) {
         let result: any;
-        console.log(`\x1b[36m[CEO Trader] ${getFriendlyToolName(toolCall.function.name)}\x1b[0m`);
+        console.log(`\${LOG_PREFIX.CEO_TRADER} ${getFriendlyToolName(toolCall.function.name)}\${ANSI_COLORS.RESET}`);
 
         try {
           const args = JSON.parse(toolCall.function.arguments);
@@ -112,12 +112,12 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
               thesis: 'Tesis'
             };
             const formattedArgs = Object.entries(args)
-              .map(([k, v]) => `\x1b[36m[CEO Trader]\x1b[0m \x1b[37m${keyTranslations[k] || k}:\x1b[0m ${v}`)
+              .map(([k, v]) => `\${LOG_PREFIX.CEO_TRADER} \${ANSI_COLORS.WHITE}${keyTranslations[k] || k}:\${ANSI_COLORS.RESET} ${v}`)
               .join('\n');
             console.log(formattedArgs);
           }
         } catch (e) {
-          console.log(`\x1b[37mArgumentos: ${toolCall.function.arguments}\x1b[0m`);
+          console.log(`\${ANSI_COLORS.WHITE}Argumentos: ${toolCall.function.arguments}\${ANSI_COLORS.RESET}`);
         }
 
         if (toolCall.function.name === 'get_account_state') {
@@ -156,7 +156,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
             }
           } else if (toolCall.function.name === 'validate_trade_intent') {
             if (parsed?.status === 'APPROVED_TECHNICAL') {
-              displayResult = `\x1b[32mAprobado\x1b[0m`;
+              displayResult = `\${ANSI_COLORS.GREEN}Aprobado\${ANSI_COLORS.RESET}`;
             } else {
               displayResult = `❌ Rechazado: ${parsed?.reason || parsed?.error || 'Motivo desconocido'}`;
             }
@@ -181,13 +181,13 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
         }
 
         if (toolCall.function.name === 'consult_smart_analyst') {
-          console.log(`\x1b[32m[Sistema]\x1b[0m ${displayResult}`);
+          console.log(`\${ANSI_COLORS.GREEN}[Sistema]\${ANSI_COLORS.RESET} ${displayResult}`);
         } else {
           let resultTitle = `Resultado de ${getFriendlyToolName(toolCall.function.name)}`;
           if (toolCall.function.name === 'validate_trade_intent') {
             resultTitle = `Resultados de Validación`;
           }
-          console.log(`\x1b[32m[Sistema] ${resultTitle}:\x1b[0m ${displayResult}`);
+          console.log(`\${ANSI_COLORS.GREEN}[Sistema] ${resultTitle}:\${ANSI_COLORS.RESET} ${displayResult}`);
         }
 
         currentMessages.push({

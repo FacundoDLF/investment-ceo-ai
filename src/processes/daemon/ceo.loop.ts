@@ -1,4 +1,7 @@
 import { DateTime } from 'luxon';
+import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
+import { SYSTEM_INTERVALS, SYSTEM_THRESHOLDS } from '@/shared/constants/system';
+import { TRADING_MODES, SYSTEM_STATES, VENUES } from '@/shared/constants/trading';
 import { runAgentCycle } from '@/features/agent/services/agent.service';
 import { MARKET_STATES } from '@/features/agent/config/ceo.mandate';
 import { runResearchAgent } from '@/features/agent/sub-agents/research.agent';
@@ -52,11 +55,11 @@ let iterationCount = 0;
 
 async function runDaemonIteration(mode?: string) {
   iterationCount++;
-  console.log(`\n\x1b[33m[Sistema]\x1b[0m Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'})...`);
+  console.log(`\n${LOG_PREFIX.SISTEMA} Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'})...`);
 
   try {
-    const venue: VenueName = mode === 'crypto' ? 'bybit' : 'alpaca';
-    console.log(`\x1b[33m[Sistema]\x1b[0m Consultando estado de billetera real en ${venue}...`);
+    const venue: VenueName = mode === TRADING_MODES.CRYPTO ? VENUES.BYBIT : VENUES.ALPACA;
+    console.log(`${LOG_PREFIX.SISTEMA} Consultando estado de billetera real en ${venue}...`);
     const balance = await getUnifiedBalance(venue);
     const spot = balance.spotPower || 0;
     const futures = balance.dayTradingPower || 0;
@@ -72,9 +75,9 @@ async function runDaemonIteration(mode?: string) {
     const pnlPercentage = balance.cash > 0 ? totalUnrealizedPnL / balance.cash : 0;
 
     // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
-    if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= -0.05) {
+    if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {
       isDamageControl = true;
-      console.log(`\x1b[31m[Sistema] ⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})\x1b[0m`);
+      console.log(`${LOG_PREFIX.SISTEMA_CRITICO} ⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
     }
 
     // Registrar Snapshot en BD
@@ -92,8 +95,8 @@ async function runDaemonIteration(mode?: string) {
     } else if (iterationCount % 5 === 0) {
       currentState = 'PORTFOLIO_AUDIT';
       marketContext = MARKET_STATES.PORTFOLIO_AUDIT;
-      console.log(`\x1b[35m[Sistema] 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})\x1b[0m`);
-    } else if (mode === 'crypto') {
+      console.log(`${LOG_PREFIX.SISTEMA} 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})${ANSI_COLORS.RESET}`);
+    } else if (mode === TRADING_MODES.CRYPTO) {
       currentState = 'CRYPTO_ALWAYS_OPEN';
       marketContext = MARKET_STATES.CRYPTO_ALWAYS_OPEN;
     } else {
@@ -114,7 +117,7 @@ async function runDaemonIteration(mode?: string) {
       }
     }
 
-    console.log(`\x1b[33m[Sistema]\x1b[0m Estado actual de mercados detectado: ${currentState}`);
+    console.log(`${LOG_PREFIX.SISTEMA} Estado actual de mercados detectado: ${currentState}`);
 
     marketContext += `\n\n**ESTADO DE TU BILLETERA REAL EN ${venue.toUpperCase()}:**\n`;
     marketContext += `- Poder Spot (Liquidez): $${spot.toFixed(2)}\n`;
@@ -133,48 +136,48 @@ async function runDaemonIteration(mode?: string) {
       }
     }
 
-    console.log('\x1b[33m[Sistema]\x1b[0m Evaluando ejecución de Sub-Agentes...');
+    console.log(`${LOG_PREFIX.SISTEMA} Evaluando ejecución de Sub-Agentes...`);
 
-    // Ejecutar Research Agent cada 1 hora (3600000 ms)
+    // Ejecutar Research Agent cada 1 hora (SYSTEM_INTERVALS.RESEARCH_MS ms)
     const now = Date.now();
-    if (now - lastResearchTime > 3600000) {
-      console.log('\x1b[33m[Sistema]\x1b[0m Ejecutando a Richard Newman (Analista Macro/Noticias)...');
+    if (now - lastResearchTime > SYSTEM_INTERVALS.RESEARCH_MS) {
+      console.log(`${LOG_PREFIX.SISTEMA} Ejecutando a Richard Newman (Analista Macro/Noticias)...`);
       cachedResearchReport = await runResearchAgent('Resumen macroeconómico, eventos clave del día y estado general del mercado de criptomonedas.');
       lastResearchTime = now;
 
       // Podríamos guardar el insight en base de datos aquí si lo necesitamos persistente
     } else {
-      console.log('\x1b[33m[Sistema]\x1b[0m Usando caché de Richard Newman (Menos de 1h desde la última ejecución).');
+      console.log(`${LOG_PREFIX.SISTEMA} Usando caché de Richard Newman (Menos de 1h desde la última ejecución).`);
     }
 
-    // Ejecutar Market Scanner cada 15 minutos (900000 ms)
-    if (mode === 'crypto') {
-      if (now - lastScannerTime > 900000) {
-        console.log('\x1b[33m[Sistema]\x1b[0m Ejecutando a Markus Skinner (Escáner de Mercado)...');
+    // Ejecutar Market Scanner cada 15 minutos (SYSTEM_INTERVALS.SCANNER_MS ms)
+    if (mode === TRADING_MODES.CRYPTO) {
+      if (now - lastScannerTime > SYSTEM_INTERVALS.SCANNER_MS) {
+        console.log(`${LOG_PREFIX.SISTEMA} Ejecutando a Markus Skinner (Escáner de Mercado)...`);
         cachedScannerReport = await runMarketScanner();
         lastScannerTime = now;
       } else {
-        console.log('\x1b[33m[Sistema]\x1b[0m Usando caché de Markus Skinner (Menos de 15m desde la última ejecución).');
+        console.log(`${LOG_PREFIX.SISTEMA} Usando caché de Markus Skinner (Menos de 15m desde la última ejecución).`);
       }
     }
 
     // El quant agent analiza SPY por defecto en modo normal, o el activo actual en modo crypto
-    const assetToAnalyze = mode === 'crypto' ? StateService.getCurrentCryptoAsset() : 'SPY';
+    const assetToAnalyze = mode === TRADING_MODES.CRYPTO ? StateService.getCurrentCryptoAsset() : 'SPY';
     let quantReport = "No se ejecutó Quant Agent por falta de liquidez (Ahorro de recursos).";
 
     if (hasCapital) {
-      console.log(`\x1b[33m[Sistema]\x1b[0m Despertando a Rick Queen (Quant Agent) para analizar ${assetToAnalyze}...`);
+      console.log(`${LOG_PREFIX.SISTEMA} Despertando a Rick Queen (Quant Agent) para analizar ${assetToAnalyze}...`);
       quantReport = await runQuantAgent(assetToAnalyze, venue);
     } else {
-      console.log(`\x1b[33m[Sistema]\x1b[0m Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
+      console.log(`${LOG_PREFIX.SISTEMA} Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
     }
 
-    console.log('\x1b[33m[Sistema]\x1b[0m Reportes listos. Entregando al CEO Trader para toma de decisiones...');
+    console.log(`${LOG_PREFIX.SISTEMA} Reportes listos. Entregando al CEO Trader para toma de decisiones...`);
 
     // Inyectar reportes al contexto del CEO
     marketContext += `\n\n**Reporte de Richard Newman (Macro/Noticias):**\n${cachedResearchReport}`;
     marketContext += `\n\n**Reporte de Rick Queen (Precios y Riesgo en Vivo):**\n${quantReport}`;
-    if (mode === 'crypto') {
+    if (mode === TRADING_MODES.CRYPTO) {
       marketContext += `\n\n**Reporte de Markus Skinner (Oportunidades):**\n${cachedScannerReport}`;
     }
 
@@ -189,26 +192,26 @@ async function runDaemonIteration(mode?: string) {
       marketContext
     );
 
-    console.log('\x1b[36m[CEO Trader] Respuesta obtenida y ciclo cerrado.\x1b[0m');
+    console.log(`${LOG_PREFIX.CEO_TRADER} Respuesta obtenida y ciclo cerrado.\x1b[0m`);
     
     let finalContent = typeof agentResponse === 'string' ? agentResponse : (agentResponse?.content || '');
     
     const titleMatch = finalContent.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
     if (titleMatch) {
-      console.log(`\x1b[32m[Auditoría / Conclusión] ${titleMatch[1].trim()}\x1b[0m`);
+      console.log(`${LOG_PREFIX.AUDITORIA} ${titleMatch[1].trim()}${ANSI_COLORS.RESET}`);
     } else {
-      console.log(`\x1b[32m[Auditoría / Conclusión] Ciclo completado sin acciones.\x1b[0m`);
+      console.log(`${LOG_PREFIX.AUDITORIA} Ciclo completado sin acciones.${ANSI_COLORS.RESET}`);
     }
 
   } catch (error: any) {
-    console.error(`\x1b[31m[Sistema] [Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}\x1b[0m`);
-    console.error(`\x1b[31m[Sistema] Deteniendo el daemon por completo para revisión manual.\x1b[0m`);
+    console.error(`${LOG_PREFIX.SISTEMA_CRITICO} [Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}${ANSI_COLORS.RESET}`);
+    console.error(`${LOG_PREFIX.SISTEMA_CRITICO} Deteniendo el daemon por completo para revisión manual.${ANSI_COLORS.RESET}`);
     process.exit(1);
   }
 }
 
 export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string) {
-  const asciiBrain = `\x1b[36m\x1b[1m
+  const asciiBrain = `${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}
        _---~~~~~-_.
      _{        )   )
    ,   ) -~~- ( ,-' )_
@@ -232,7 +235,7 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
  |_____|_____|_____|  /__/  \\__\\|___|
 
   \x1b[0m
-  \x1b[32m\x1b[1mInvestment CEO AI(Modo: ${mode || 'Normal'}) \x1b[0m\n`;
+  ${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}Investment CEO AI(Modo: ${mode || 'Normal'}) ${ANSI_COLORS.RESET}\n`;
 
   console.log(asciiBrain);
 
@@ -242,7 +245,7 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
     let currentInterval = initialIntervalSeconds;
 
     // Aceleración Dinámica para Crypto
-    if (mode === 'crypto') {
+    if (mode === TRADING_MODES.CRYPTO) {
       const now = DateTime.now().setZone('America/New_York');
       const totalMinutes = now.hour * 60 + now.minute;
 
@@ -250,9 +253,9 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
       const isAsianPeak = totalMinutes >= 20 * 60 && totalMinutes <= 22 * 60; // 20:00 a 22:00 NY
 
       if (isMorningPeak || isAsianPeak) {
-        currentInterval = 5; // Aceleración: cada 5 segundos en horarios pico
+        currentInterval = SYSTEM_INTERVALS.CEO_PEAK_SEC; // Aceleración: cada 5 segundos en horarios pico
       } else {
-        currentInterval = 60; // Valle: cada 60 segundos
+        currentInterval = SYSTEM_INTERVALS.CEO_BASE_SEC; // Valle: cada 60 segundos
       }
     }
 
@@ -262,11 +265,11 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
 }
 
 if (require.main === module) {
-  const modeArg = process.argv.includes('crypto') ? 'crypto' : undefined;
+  const modeArg = process.argv.includes(TRADING_MODES.CRYPTO) ? TRADING_MODES.CRYPTO : undefined;
   
   // Scrappy se inicia en todos los modos (tanto regular como crypto)
   startScrappyDaemon().catch(console.error);
 
   // Intervalo base de 60s, la lógica interna lo acelerará si es crypto y horario pico
-  startCeoDaemon(60, modeArg).catch(console.error);
+  startCeoDaemon(SYSTEM_INTERVALS.CEO_BASE_SEC, modeArg).catch(console.error);
 }

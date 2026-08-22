@@ -1,6 +1,8 @@
 import Groq from 'groq-sdk';
 import type { ChatCompletionCreateParamsNonStreaming, ChatCompletion } from 'groq-sdk/resources/chat/completions';
 
+import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
+
 export const nativeGroqClient = new Groq({
   apiKey: process.env.GROQ_API_KEY,
   timeout: 45000,
@@ -61,7 +63,7 @@ export async function createChatCompletionWithRetry(
 
     if (availableModelIndex === -1) {
       if (minWaitTime === Infinity) {
-        console.error(`\x1b[31m[API Groq] Fallo irreversible: todos los modelos fallaron permanentemente.\x1b[0m`);
+        console.error(`\${ANSI_COLORS.RED}[API Groq] Fallo irreversible: todos los modelos fallaron permanentemente.\${ANSI_COLORS.RESET}`);
         throw new Error("Todos los modelos fallaron permanentemente (400, 403, 404, 5xx)");
       }
 
@@ -77,7 +79,7 @@ export async function createChatCompletionWithRetry(
     if (currentModel !== params.model) {
       const isFree = currentModel.endsWith(':free');
       const warningType = isFree ? 'Free Version' : 'Modelo Suplente';
-      console.warn(`\x1b[33m[Sistema] ⚠️ ATENCIÓN: Usando ${warningType} (${currentModel}) por fallo del principal.\x1b[0m`);
+      console.warn(`\${ANSI_COLORS.YELLOW}[Sistema] ⚠️ ATENCIÓN: Usando ${warningType} (${currentModel}) por fallo del principal.\${ANSI_COLORS.RESET}`);
     }
 
     try {
@@ -90,14 +92,14 @@ export async function createChatCompletionWithRetry(
 
       if (error?.status === 402) {
         if (!currentModel.endsWith(':free')) {
-          console.warn(`\x1b[31m[API] Error 402 Payment Required en ${currentModel}. Cambiando a modelos gratuitos...\x1b[0m`);
+          console.warn(`\${ANSI_COLORS.RED}[API] Error 402 Payment Required en ${currentModel}. Cambiando a modelos gratuitos...\${ANSI_COLORS.RESET}`);
           // Marcar todos los modelos de pago como fallidos para no perder tiempo
           for (const m of allModels) {
             if (!m.endsWith(':free')) permanentlyFailedModels.add(m);
           }
           continue;
         } else {
-          console.error(`\x1b[31m[API] Error 402 Payment Required en modelo gratuito ${currentModel}. Tu cuenta de OpenRouter está totalmente bloqueada. Abortando.\x1b[0m`);
+          console.error(`\${ANSI_COLORS.RED}[API] Error 402 Payment Required en modelo gratuito ${currentModel}. Tu cuenta de OpenRouter está totalmente bloqueada. Abortando.\${ANSI_COLORS.RESET}`);
           throw new Error(`API Key bloqueada (402 Payment Required) al intentar usar modelo gratuito ${currentModel}.`);
         }
       }
@@ -143,13 +145,13 @@ export async function createChatCompletionWithRetry(
         if (waitTimeMs <= 0) waitTimeMs = 15000;
 
         globalModelCooldowns.set(currentModel, Date.now() + waitTimeMs);
-        console.warn(`\x1b[31m[Model Fallback]\x1b[0m RateLimit (429) en ${currentModel}. Cooldown: ${waitTimeMs}ms...`);
+        console.warn(`\${ANSI_COLORS.RED}[Model Fallback]\${ANSI_COLORS.RESET} RateLimit (429) en ${currentModel}. Cooldown: ${waitTimeMs}ms...`);
         continue;
       }
 
       if (isNetworkError || isModelError) {
         let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported (${error?.status})`;
-        console.warn(`\x1b[31m[Model Fallback]\x1b[0m ${errorType} en ${currentModel}. Descartado para esta solicitud...`);
+        console.warn(`\${ANSI_COLORS.RED}[Model Fallback]\${ANSI_COLORS.RESET} ${errorType} en ${currentModel}. Descartado para esta solicitud...`);
 
         // Log al postmortem
         try {

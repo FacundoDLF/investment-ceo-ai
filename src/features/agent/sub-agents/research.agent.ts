@@ -21,7 +21,10 @@ export async function runResearchAgent(query: string): Promise<string> {
   let response = await createChatCompletionWithRetry({
     model: 'meta-llama/llama-3.3-70b-instruct',
     fallbackModels: [
-      'qwen/qwen-2.5-72b-instruct'
+      'qwen/qwen-2.5-72b-instruct',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'nvidia/llama-3.1-nemotron-70b-instruct:free',
+      'qwen/qwen-2-72b-instruct:free'
     ],
     messages,
     tools: [serperSearchTool, tavilyResearchTool],
@@ -88,7 +91,10 @@ export async function runResearchAgent(query: string): Promise<string> {
     response = await createChatCompletionWithRetry({
       model: 'meta-llama/llama-3.3-70b-instruct',
       fallbackModels: [
-        'qwen/qwen-2.5-72b-instruct'
+        'qwen/qwen-2.5-72b-instruct',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'nvidia/llama-3.1-nemotron-70b-instruct:free',
+        'qwen/qwen-2-72b-instruct:free'
       ],
       messages,
       tools: [serperSearchTool, tavilyResearchTool],

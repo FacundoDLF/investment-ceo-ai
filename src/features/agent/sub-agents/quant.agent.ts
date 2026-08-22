@@ -46,7 +46,10 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
   let response = await createChatCompletionWithRetry({
     model: 'meta-llama/llama-3.3-70b-instruct',
     fallbackModels: [
-      'qwen/qwen-2.5-72b-instruct'
+      'qwen/qwen-2.5-72b-instruct',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'nvidia/llama-3.1-nemotron-70b-instruct:free',
+      'qwen/qwen-2-72b-instruct:free'
     ],
     messages,
     tools,
@@ -110,7 +113,10 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     response = await createChatCompletionWithRetry({
       model: 'meta-llama/llama-3.3-70b-instruct',
       fallbackModels: [
-        'qwen/qwen-2.5-72b-instruct'
+        'qwen/qwen-2.5-72b-instruct',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'nvidia/llama-3.1-nemotron-70b-instruct:free',
+        'qwen/qwen-2-72b-instruct:free'
       ],
       messages,
       tools,

@@ -74,6 +74,12 @@ export async function createChatCompletionWithRetry(
     const currentModel = allModels[availableModelIndex];
     const client = currentModel.includes('/') ? openRouterClient : nativeGroqClient;
 
+    if (currentModel !== params.model) {
+      const isFree = currentModel.endsWith(':free');
+      const warningType = isFree ? 'Free Version' : 'Modelo Suplente';
+      console.warn(`\x1b[33m[Sistema] ⚠️ ATENCIÓN: Usando ${warningType} (${currentModel}) por fallo del principal.\x1b[0m`);
+    }
+
     try {
       const currentParams = { max_tokens: 500, ...params, model: currentModel };
       delete (currentParams as any).fallbackModels;
@@ -127,7 +133,7 @@ export async function createChatCompletionWithRetry(
       } 
       
       if (isNetworkError || isModelError) {
-        let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported (${error?.status})`;
+        let errorType = isNetworkError ? `Network/Timeout (${error?.status || '5xx'})` : `ModelNotFound/Unsupported/PaymentRequired (${error?.status})`;
         console.warn(`\x1b[31m[Model Fallback]\x1b[0m ${errorType} en ${currentModel}. Descartado para esta solicitud...`);
         
         // Log al postmortem

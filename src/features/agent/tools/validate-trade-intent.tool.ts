@@ -5,7 +5,7 @@ export const validateTradeIntentSchema = z.object({
   venue: z.enum(['alpaca', 'bybit']).describe('Venue donde se planea ejecutar'),
   symbol: z.string().describe('Símbolo del activo (ej. BTCUSDT)'),
   side: z.enum(['buy', 'sell']).describe('Dirección de la orden planificada'),
-  qty: z.number().positive().describe('Cantidad planificada'),
+  qty: z.coerce.number().positive().describe('Cantidad planificada'),
   category: z.enum(['spot', 'linear']).optional().describe('Categoría del mercado'),
 });
 

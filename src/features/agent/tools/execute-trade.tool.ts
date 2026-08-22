@@ -50,14 +50,18 @@ export async function executeExecuteTrade(args: string) {
     }
     const params = parsedResult.data;
 
-    // Normalizar qty para Bybit para evitar "Qty invalid"
+    // Normalizar qty para Bybit para evitar "Qty invalid" (Redondeo a 0)
     if (params.venue === 'bybit') {
       if (params.symbol === 'BTCUSDT') {
-        params.qty = Math.floor(params.qty * 1000) / 1000;
+        params.qty = Math.floor(params.qty * 100000) / 100000; // 5 decimales
       } else if (params.symbol === 'ETHUSDT') {
-        params.qty = Math.floor(params.qty * 100) / 100;
+        params.qty = Math.floor(params.qty * 10000) / 10000; // 4 decimales
       } else {
-        params.qty = Math.floor(params.qty);
+        params.qty = Math.floor(params.qty * 100) / 100; // 2 decimales
+      }
+      
+      if (params.qty <= 0) {
+        return JSON.stringify({ error: `La cantidad calculada (${params.qty}) es inválida o se redondeó a cero. Aumenta el monto a invertir o verifica el mínimo del exchange.` });
       }
     }
 

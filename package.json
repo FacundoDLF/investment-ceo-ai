@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ceo": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts --watch",
+    "ceo:crypto": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts crypto --watch"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

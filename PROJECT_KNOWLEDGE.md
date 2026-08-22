@@ -25,6 +25,12 @@
   2. Para evitar crasheos completos, se actualizó la lista de fallbacks en los agentes utilizando modelos que se verificó que existen en el endpoint actual mediante el script `list_models.ts`.
 * **REGLA:** Siempre incluye múltiples `fallbackModels` en llamadas críticas (`createChatCompletionWithRetry`) y, si hay un fallo masivo de modelos, verifica inmediatamente el endpoint usando el script de listar modelos para ver la nueva oferta real.
 
+### [ISSUE] Daemon crashea al agotar saldo de OpenRouter (Error 402 Payment Required)
+* **Contexto:** Cuando la cuenta de OpenRouter se queda sin créditos, la API devuelve HTTP 402.
+* **Problema:** El sistema de Fallback (`groq.ts`) estaba asumiendo que el 402 era un modelo no soportado (`ModelNotFound/Unsupported`). Metía todos los modelos en la lista negra (`permanentlyFailedModels`) intentando hacer fallback iterativamente, y finalmente crasheaba todo el Daemon lanzando el error: "Todos los modelos fallaron permanentemente".
+* **Solución:** En `groq.ts` se añadió un manejo explícito para el Status 402. Si se detecta un 402, el script ahora lanza un `throw new Error("API Key sin fondos (402 Payment Required)...")` **inmediatamente**, en lugar de intentar fallbacks y enmascarar el error original.
+* **REGLA:** Nunca silencies un error 402. Si la cuenta no tiene fondos, no tiene sentido reintentar con otros modelos del mismo proveedor. Aborta rápido y avisa al usuario.
+
 ### [DECISIÓN] Consulta a Modelos "Smart" (Consult Analyst Tool)
 * **Contexto:** Llama 70B en Groq es ultra rápido (ideal para High Frequency Trading), pero a veces carece del razonamiento profundo.
 * **Solución:** Se creó la herramienta `consult_smart_analyst`. Llama 70B tiene permiso para invocarla si el mercado es ambiguo. Esto envía el contexto por debajo a OpenRouter y le devuelve el consejo estratégico a Llama.
@@ -33,11 +39,11 @@
 
 ## 2. Ejecución de Órdenes y Brokers
 
-### [ISSUE] Bybit API Error: Qty invalid
-* **Contexto:** Al operar futuros lineales en Bybit (ej. `ETHUSDT`), el Quant Agent calculaba cantidades matemáticas precisas (ej. `14.905`).
-* **Problema:** Bybit rechaza cantidades con excesivos decimales para criptomonedas específicas (ETH suele requerir saltos de lote de `0.01`).
-* **Solución:** En `src/features/agent/tools/execute-trade.tool.ts`, justo antes de enviar la orden, se implementó una normalización del `qty` (`Math.floor`). Para BTC se trunca a 3 decimales, para ETH a 2, y para otros a números enteros. 
-* **REGLA:** NUNCA envíes un `qty` en crudo devuelto por el Risk Engine al broker sin pasarlo por la normalización de lotes.
+### [ISSUE] Bybit API Error: Qty invalid o "Data sent for paramter '' is not valid"
+* **Contexto:** Al operar en Bybit (ej. `BTCUSDT`), el Quant Agent calculaba cantidades matemáticas precisas pero muy pequeñas (ej. `0.00054`).
+* **Problema:** Bybit rechaza cantidades con excesivos decimales, pero el truncado original agresivo (`Math.floor(qty * 1000) / 1000`) provocaba que compras pequeñas de BTC terminaran siendo `0`. La API de Bybit rechaza cantidades `0` con el críptico error: `Data sent for paramter '' is not valid`.
+* **Solución:** En `src/features/agent/tools/execute-trade.tool.ts` y `scrappy.agent.ts`, se refinó la normalización. Ahora BTC preserva hasta 5 decimales (`Math.floor(qty * 100000) / 100000`), ETH hasta 4, y el resto hasta 2. Si el truncado final arroja `<= 0`, se detiene la orden localmente lanzando un error claro al LLM ("cantidad inválida o redondeada a cero") en lugar de chocar contra el broker.
+* **REGLA:** NUNCA envíes un `qty` igual a 0 al broker ni uses un `Math.floor` entero para criptomonedas valiosas.
 
 ### [ISSUE] Bybit API Error: ab not enough for new order (Hedge Mode Close)
 * **Contexto:** El CEO intentaba cerrar una posición Long perdedora durante el MODO DAMAGE CONTROL.

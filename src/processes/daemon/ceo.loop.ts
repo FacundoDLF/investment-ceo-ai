@@ -179,10 +179,10 @@ async function runDaemonIteration(mode?: string) {
     }
 
     const agentPrompt = isDamageControl 
-      ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES.`
+      ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.`
       : (currentState === 'PORTFOLIO_AUDIT' 
-        ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS.`
-        : `Analiza los reportes de tus sub-agentes, el estado del mercado actual y ejecuta operaciones segundo a segundo si encuentras una oportunidad clara según tu Risk Engine. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio. En modo crypto, operas 24/7 sin descanso.`);
+        ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.`
+        : `Analiza los reportes de tus sub-agentes, el estado del mercado actual y ejecuta operaciones segundo a segundo si encuentras una oportunidad clara según tu Risk Engine. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio. En modo crypto, operas 24/7 sin descanso. REGLA ESTRICTA: SOLO estás autorizado a operar en el broker activo: ${venue.toUpperCase()}. Ignora tu balance en otros brokers.`);
 
     const agentResponse = await runAgentCycle(
       agentPrompt,

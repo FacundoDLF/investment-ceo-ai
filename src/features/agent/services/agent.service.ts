@@ -15,7 +15,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
   if (marketContext) {
     promptContext += `\n\n**Contexto de Mercado y Sub-Agentes:**\n${marketContext}`;
   }
-  
+
   promptContext += `\n\nPIENSA EN VOZ ALTA (Chain of Thought): Antes de usar una herramienta, usa libremente tu respuesta (el campo content) para razonar exhaustivamente. Piensa paso a paso. REGLA OBLIGATORIA: Al FINALIZAR tu razonamiento, DEBES resumir tu pensamiento agregando un título de máximo 6 palabras entre corchetes al final de tu texto. IMPORTANTE: Si estás en MODO PORTFOLIO_AUDIT o DAMAGE_CONTROL y decides NO ejecutar ninguna acción (es decir, todo está bien o decides esperar), tu título DEBE indicar el estado de salud claramente, por ejemplo [TÍTULO: Salud OK - Hold] o [TÍTULO: Auditoría Limpia].`;
 
   const messages: ChatCompletionMessageParam[] = [
@@ -36,7 +36,10 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       response = await createChatCompletionWithRetry({
         model: 'meta-llama/llama-3.3-70b-instruct',
         fallbackModels: [
-          'qwen/qwen-2.5-72b-instruct'
+          'qwen/qwen-2.5-72b-instruct',
+          'meta-llama/llama-3.3-70b-instruct:free',
+          'nvidia/llama-3.1-nemotron-70b-instruct:free',
+          'qwen/qwen-2-72b-instruct:free'
         ],
         messages: currentMessages,
         tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool],
@@ -44,8 +47,8 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     } catch (error: any) {
       if (error.status === 400 && error.message?.includes('tool call validation failed')) {
         console.warn('\x1b[31m[Sistema] Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...\x1b[0m');
-        currentMessages.push({ 
-          role: 'user', 
+        currentMessages.push({
+          role: 'user',
           content: 'Tu última llamada a herramienta fue rechazada por el servidor porque usaste un nombre inválido (ej: agregaste <|channel|>) o violaste el esquema JSON. Responde con el nombre de herramienta y formato exacto requerido.'
         });
         iterations++;
@@ -70,7 +73,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
               try {
                 JSON.parse(tc.function.arguments + '"}');
                 tc.function.arguments += '"}';
-              } catch (e3) {}
+              } catch (e3) { }
             }
           }
         }
@@ -90,8 +93,33 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       for (const toolCall of responseMessage.tool_calls) {
         let result: any;
         console.log(`\x1b[36m[CEO Trader] ${getFriendlyToolName(toolCall.function.name)}\x1b[0m`);
-        console.log(`\x1b[37mArgumentos: ${toolCall.function.arguments}\x1b[0m`);
-        
+
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          if (Object.keys(args).length > 0) {
+            const keyTranslations: Record<string, string> = {
+              duda: 'Consulta',
+              venue: 'Broker',
+              symbol: 'Coin',
+              side: 'Acción',
+              qty: 'Cantidad',
+              category: 'Categoría',
+              type: 'Tipo',
+              limitPrice: 'Precio Limite',
+              stopLoss: 'Stop Loss',
+              takeProfit: 'Target',
+              strategy: 'Estrategia',
+              thesis: 'Tesis'
+            };
+            const formattedArgs = Object.entries(args)
+              .map(([k, v]) => `\x1b[36m[CEO Trader]\x1b[0m \x1b[37m${keyTranslations[k] || k}:\x1b[0m ${v}`)
+              .join('\n');
+            console.log(formattedArgs);
+          }
+        } catch (e) {
+          console.log(`\x1b[37mArgumentos: ${toolCall.function.arguments}\x1b[0m`);
+        }
+
         if (toolCall.function.name === 'get_account_state') {
           result = await executeGetAccountState();
         } else if (toolCall.function.name === 'execute_trade') {
@@ -109,10 +137,10 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
         }
 
         let displayResult = result;
-        
+
         try {
           const parsed = typeof result === 'string' && result.startsWith('{') ? JSON.parse(result) : result;
-          
+
           if (toolCall.function.name === 'get_account_state') {
             const bybitCash = parsed?.consolidatedBalance?.bybit?.cash ? parsed.consolidatedBalance.bybit.cash.toFixed(2) : '0';
             const bybitSpot = parsed?.consolidatedBalance?.bybit?.spotPower ? parsed.consolidatedBalance.bybit.spotPower.toFixed(2) : '0';
@@ -128,7 +156,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
             }
           } else if (toolCall.function.name === 'validate_trade_intent') {
             if (parsed?.status === 'APPROVED_TECHNICAL') {
-              displayResult = `\n\x1b[32mAprobado\x1b[0m`;
+              displayResult = `\x1b[32mAprobado\x1b[0m`;
             } else {
               displayResult = `❌ Rechazado: ${parsed?.reason || parsed?.error || 'Motivo desconocido'}`;
             }
@@ -138,11 +166,13 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
             } else {
               displayResult = `Error: ${parsed?.error}`;
             }
+          } else if (toolCall.function.name === 'consult_smart_analyst') {
+            displayResult = `Informe Estratégico completado y entregado al CEO.`;
           } else if (toolCall.function.name === 'command_scrappy') {
-             try {
-               const args = JSON.parse(toolCall.function.arguments);
-               displayResult = `(Acción: ${args.action}, Motivo: ${args.reason})`;
-             } catch(e) {}
+            try {
+              const args = JSON.parse(toolCall.function.arguments);
+              displayResult = `(Acción: ${args.action}, Motivo: ${args.reason})`;
+            } catch (e) { }
           } else if (typeof result === 'object') {
             displayResult = JSON.stringify(result);
           }
@@ -150,15 +180,23 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           if (typeof result === 'object') displayResult = JSON.stringify(result);
         }
 
-        console.log(`\x1b[32m[Sistema] Resultado de ${getFriendlyToolName(toolCall.function.name)}:\x1b[0m ${displayResult}`);
-        
+        if (toolCall.function.name === 'consult_smart_analyst') {
+          console.log(`\x1b[32m[Sistema]\x1b[0m ${displayResult}`);
+        } else {
+          let resultTitle = `Resultado de ${getFriendlyToolName(toolCall.function.name)}`;
+          if (toolCall.function.name === 'validate_trade_intent') {
+            resultTitle = `Resultados de Validación`;
+          }
+          console.log(`\x1b[32m[Sistema] ${resultTitle}:\x1b[0m ${displayResult}`);
+        }
+
         currentMessages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
           name: toolCall.function.name,
           content: JSON.stringify(result)
         } as ChatCompletionMessageParam);
-        
+
         finalResult = result;
       }
       iterations++;

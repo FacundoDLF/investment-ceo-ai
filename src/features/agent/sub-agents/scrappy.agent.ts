@@ -7,6 +7,7 @@ import { prisma } from '@/shared/lib/prisma';
 // Estado en memoria de Scrappy
 let currentScalpPosition: { symbol: string, side: 'buy' | 'sell', entryPrice: number, qty: number } | null = null;
 let lastLogTime = 0;
+let lastHeartbeatTime = 0;
 
 export async function runScrappyIteration() {
   const config = StateService.getScrappyState();
@@ -71,10 +72,12 @@ Reglas Críticas:
     };
 
     const response = await createChatCompletionWithRetry({
-      model: 'qwen/qwen3.6-27b', // Modelo disponible en la API actual
+      model: 'meta-llama/llama-3.3-70b-instruct',
       fallbackModels: [
-        'openai/gpt-oss-20b',
-        'allam-2-7b'
+        'qwen/qwen-2.5-72b-instruct',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'nvidia/llama-3.1-nemotron-70b-instruct:free',
+        'qwen/qwen-2-72b-instruct:free'
       ],
       messages: [{ role: 'system', content: systemPrompt }],
       tools: [scalpTool],
@@ -86,7 +89,27 @@ Reglas Críticas:
       const tc = msg.tool_calls[0];
       if (tc.function.name === 'scalp_action') {
         const args = JSON.parse(tc.function.arguments);
-        await executeScalpAction(args.action, symbol, config.budget, midPrice, pnlPct);
+        const action = args.action;
+
+        // Logging visual amigable
+        if (action === 'OPEN_LONG' || action === 'OPEN_SHORT') {
+           console.log(`\x1b[35m[Scrappy]\x1b[0m ⚡ Abriendo posición ${action === 'OPEN_LONG' ? 'LONG' : 'SHORT'} rápida en ${symbol} (Precio: $${midPrice.toFixed(2)})`);
+        } else if (action === 'CLOSE_POSITION') {
+           console.log(`\x1b[35m[Scrappy]\x1b[0m 💥 Cerrando posición en ${symbol} (PnL estimado: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%)`);
+        } else {
+           const now = Date.now();
+           // Latido cada 30 segundos si está inactivo o holdeando
+           if (now - lastHeartbeatTime > 30000) {
+              if (currentScalpPosition) {
+                 console.log(`\x1b[35m[Scrappy]\x1b[0m 👀 Manteniendo ${currentScalpPosition.side.toUpperCase()} en ${symbol} | PnL actual: ${pnlPct > 0 ? '\x1b[32m+' : '\x1b[31m'}${pnlPct.toFixed(3)}%\x1b[0m`);
+              } else {
+                 console.log(`\x1b[35m[Scrappy]\x1b[0m ⏳ Buscando oportunidad de scalping en ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
+              }
+              lastHeartbeatTime = now;
+           }
+        }
+
+        await executeScalpAction(action, symbol, config.budget, midPrice, pnlPct);
       }
     }
 
@@ -132,9 +155,13 @@ async function executeScalpAction(action: string, symbol: string, budget: number
       let qty = budget / currentPrice;
       
       // Normalizar qty para Bybit
-      if (symbol === 'BTCUSDT') qty = Math.floor(qty * 1000) / 1000;
-      else if (symbol === 'ETHUSDT') qty = Math.floor(qty * 100) / 100;
-      else qty = Math.floor(qty);
+      if (symbol === 'BTCUSDT') {
+        qty = Math.floor(qty * 100000) / 100000;
+      } else if (symbol === 'ETHUSDT') {
+        qty = Math.floor(qty * 10000) / 10000;
+      } else {
+        qty = Math.floor(qty * 100) / 100;
+      }
 
       if (qty <= 0) return;
 

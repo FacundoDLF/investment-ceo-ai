@@ -25,7 +25,7 @@ export async function executeConsultAnalyst(args: string, marketContext: string)
     const parsedArgs = JSON.parse(args);
     const params = consultAnalystSchema.parse(parsedArgs);
 
-    console.log('\x1b[35m[Marta Fan]\x1b[0m Analizando consulta táctica del CEO Trader...');
+    console.log('\x1b[35m[Experto S.M.A.R.T]\x1b[0m Analizando consulta táctica del CEO Trader...');
 
     const promptContext = `Eres el Analista Senior (Smart Agent) del fondo. El CEO rápido (HFT) tiene una duda y necesita tu consejo profundo y analítico.
 Contexto de Mercado:
@@ -33,12 +33,19 @@ ${marketContext}`;
 
     const response = await createChatCompletionWithRetry({
       model: 'meta-llama/llama-3.3-70b-instruct',
-      fallbackModels: ['qwen/qwen-2.5-72b-instruct'],
+      fallbackModels: [
+        'qwen/qwen-2.5-72b-instruct',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'nvidia/llama-3.1-nemotron-70b-instruct:free',
+        'qwen/qwen-2-72b-instruct:free'
+      ],
       messages: [
         { role: 'system', content: promptContext },
         { role: 'user', content: `Consulta del CEO: ${params.duda}\nAnaliza la situación y dame una recomendación clara de sí/no o qué parámetros ajustar.` }
       ]
     });
+
+    console.log('\x1b[35m[Experto S.M.A.R.T]\x1b[0m Análisis finalizado. Entregando reporte...');
 
     return JSON.stringify({
       success: true,

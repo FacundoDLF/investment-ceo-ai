@@ -242,6 +242,7 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
   ${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}Investment CEO AI(Modo: ${mode || 'Normal'}) ${ANSI_COLORS.RESET}\n`;
 
   console.log(asciiBrain);
+  ModelRouter.printRegistryTable();
 
   while (true) {
     await runDaemonIteration(mode);

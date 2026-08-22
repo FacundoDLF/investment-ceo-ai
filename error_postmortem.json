@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-22T19:59:49.507Z",
-  "uid": "groq::openai/gpt-oss-20b",
-  "model": "openai/gpt-oss-20b",
+  "timestamp": "2026-08-22T20:01:45.699Z",
+  "uid": "groq::openai/gpt-oss-120b",
+  "model": "openai/gpt-oss-120b",
   "provider": "groq",
   "status": 400,
-  "error": "400 {\"error\":{\"message\":\"Tool call validation failed: tool call validation failed: attempted to call tool 'scapl_action' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"scapl_action\\\", \\\"arguments\\\": {\\\"action\\\":\\\"HOLD\\\"}}\"}}"
+  "error": "400 {\"error\":{\"message\":\"Failed to parse tool call arguments as JSON\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"validate_trade_intent\\\", \\\"arguments\\\": {\\n  \\\"category\\\": \\\"spot\\\",\\n  \\\"qty\\\": 0.1727,\\n  \\\"side\\\": \\\"buy\\\",\\n  \\\"symbol\\\": \\\"BTCUSDT\\\",\\n  \\\"venue\\\": \\\"bybit\\\"\\n\\\"}\"}}"
 }

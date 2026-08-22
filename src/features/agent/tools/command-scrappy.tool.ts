@@ -5,7 +5,8 @@ import { StateService } from '../services/state.service';
 export const commandScrappySchema = z.object({
   action: z.enum(['START', 'STOP', 'UPDATE']).describe('Acción a tomar sobre Scrappy'),
   asset: z.string().optional().describe('Símbolo del activo a operar (ej. BTCUSDT)'),
-  budget: z.number().optional().describe('Presupuesto máximo en USDT que Scrappy tiene permitido usar (ej. 100)')
+  budget: z.number().optional().describe('Presupuesto máximo en USDT que Scrappy tiene permitido usar (ej. 100)'),
+  reason: z.string().describe('Motivo de la decisión en una sola palabra')
 });
 
 export const commandScrappyTool: ChatCompletionTool = {
@@ -18,9 +19,10 @@ export const commandScrappyTool: ChatCompletionTool = {
       properties: {
         action: { type: 'string', enum: ['START', 'STOP', 'UPDATE'] },
         asset: { type: 'string' },
-        budget: { type: 'number' }
+        budget: { type: 'number' },
+        reason: { type: 'string' }
       },
-      required: ['action'],
+      required: ['action', 'reason'],
     },
   },
 };

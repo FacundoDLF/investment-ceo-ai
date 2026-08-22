@@ -7,6 +7,7 @@ import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/
 import { closePositionTool, executeClosePosition } from '@/features/agent/tools/close-position.tool';
 import { commandScrappyTool, executeCommandScrappy } from '@/features/agent/tools/command-scrappy.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
+import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
 export async function runAgentCycle(userMessage?: string, marketContext?: string) {
@@ -88,7 +89,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
     if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
       for (const toolCall of responseMessage.tool_calls) {
         let result: any;
-        console.log(`\x1b[36m[CEO Trader] Ejecutando acción estratégica: ${toolCall.function.name}\x1b[0m`);
+        console.log(`\x1b[36m[CEO Trader] ${getFriendlyToolName(toolCall.function.name)}\x1b[0m`);
         console.log(`\x1b[37mArgumentos: ${toolCall.function.arguments}\x1b[0m`);
         
         if (toolCall.function.name === 'get_account_state') {
@@ -125,6 +126,23 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
             } else {
               displayResult = `✅ Orden creada con éxito (ID: ${parsed?.orderId})`;
             }
+          } else if (toolCall.function.name === 'validate_trade_intent') {
+            if (parsed?.status === 'APPROVED_TECHNICAL') {
+              displayResult = `\n\x1b[32mAprobado\x1b[0m`;
+            } else {
+              displayResult = `❌ Rechazado: ${parsed?.reason || parsed?.error || 'Motivo desconocido'}`;
+            }
+          } else if (toolCall.function.name === 'get_market_price') {
+            if (parsed?.success) {
+              displayResult = `Activo: ${parsed.symbol} | Precio exacto: (Ask: $${parsed.ask}, Bid: $${parsed.bid})`;
+            } else {
+              displayResult = `Error: ${parsed?.error}`;
+            }
+          } else if (toolCall.function.name === 'command_scrappy') {
+             try {
+               const args = JSON.parse(toolCall.function.arguments);
+               displayResult = `(Acción: ${args.action}, Motivo: ${args.reason})`;
+             } catch(e) {}
           } else if (typeof result === 'object') {
             displayResult = JSON.stringify(result);
           }
@@ -132,7 +150,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           if (typeof result === 'object') displayResult = JSON.stringify(result);
         }
 
-        console.log(`\x1b[32m[Sistema] Resultado de ${toolCall.function.name}:\x1b[0m ${displayResult}`);
+        console.log(`\x1b[32m[Sistema] Resultado de ${getFriendlyToolName(toolCall.function.name)}:\x1b[0m ${displayResult}`);
         
         currentMessages.push({
           role: 'tool',

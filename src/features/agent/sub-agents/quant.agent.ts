@@ -3,6 +3,7 @@ import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/to
 import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
 import { RiskEngine } from '@/features/risk/risk.engine';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
+import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import { z } from 'zod';
 
 const QUANT_MANDATE = `Eres el Quant Agent del fondo cuantitativo.
@@ -78,7 +79,7 @@ export async function runQuantAgent(asset: string, venue: string): Promise<strin
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\x1b[35m[Rick Queen]\x1b[0m Ejecutando herramienta: ${toolCall.function.name}`);
+      console.log(`\x1b[35m[Rick Queen]\x1b[0m ${getFriendlyToolName(toolCall.function.name)}`);
       let toolResult = '';
       
       try {

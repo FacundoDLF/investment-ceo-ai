@@ -1,6 +1,7 @@
 import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { serperSearchTool, executeSerperSearch } from '@/features/agent/tools/serper-search.tool';
 import { tavilyResearchTool, executeTavilyResearch } from '@/features/agent/tools/tavily-research.tool';
+import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import type { ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
 const RESEARCH_MANDATE = `Eres el Research Agent del fondo cuantitativo.
@@ -53,13 +54,19 @@ export async function runResearchAgent(query: string): Promise<string> {
     messages.push(responseMessage as ChatCompletionMessageParam);
     
     for (const toolCall of responseMessage.tool_calls) {
-      console.log(`\x1b[35m[Richard Newman]\x1b[0m Ejecutando herramienta: ${toolCall.function.name}`);
+      console.log(`\x1b[35m[Richard Newman]\x1b[0m ${getFriendlyToolName(toolCall.function.name)}`);
       let toolResult = '';
       
       try {
         if (toolCall.function.name === 'serper_search') {
+          console.log('\x1b[35m[Richard Newman]\x1b[0m Informando...');
           const result = await executeSerperSearch(toolCall.function.arguments);
           toolResult = JSON.stringify(result);
+          try {
+             const q = JSON.parse(toolCall.function.arguments).query || "Búsqueda web";
+             const shortQuery = q.split(' ').slice(0, 3).join(' ');
+             console.log(`\x1b[35m[Richard Newman]\x1b[0m CEO Informado. Tema: ${shortQuery}`);
+          } catch(e) {}
         } else if (toolCall.function.name === 'tavily_research') {
           const result = await executeTavilyResearch(toolCall.function.arguments);
           toolResult = JSON.stringify(result);
@@ -90,5 +97,11 @@ export async function runResearchAgent(query: string): Promise<string> {
     iterations++;
   }
 
-  return responseMessage?.content || 'No se pudo generar un reporte de investigación.';
+  const finalReport = responseMessage?.content || 'No se pudo generar un reporte de investigación.';
+  if (finalReport) {
+    // Tomamos solo la primera oración para mostrar en consola como resumen
+    const firstSentence = finalReport.split('.')[0] + '.';
+    console.log(`\x1b[35m[Richard Newman]\x1b[0m Resumen de investigación: ${firstSentence}`);
+  }
+  return finalReport;
 }

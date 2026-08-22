@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-08-22T16:05:22.535Z",
-  "model": "llama-3.3-70b-versatile",
-  "status": 404,
-  "error": "404 {\"error\":{\"message\":\"The model `llama-3.3-70b-versatile` does not exist or you do not have access to it.\",\"type\":\"invalid_request_error\",\"code\":\"model_not_found\"}}",
+  "timestamp": "2026-08-22T16:53:30.765Z",
+  "model": "qwen/qwen-2.5-72b-instruct",
+  "status": 402,
+  "error": "402 {\"error\":{\"message\":\"This request would exceed your available credits given your current in-flight requests. Retry after in-flight requests settle, or add credits.\",\"code\":402,\"metadata\":{\"reason\":\"in_flight_budget_exhausted\",\"limit_source\":\"openrouter_in_flight_budget\",\"remedy_hint\":\"Retry after your in-flight requests settle (see the Retry-After header). Adding credits at https://openrouter.ai/settings/credits raises your in-flight budget, up to a capped ceiling.\",\"headers\":{\"Retry-After\":\"120\"},\"provider_name\":null}},\"user_id\":\"user_3IE4uzqVmVB96xTqOzJ0KlGkdeC\"}",
   "headers": {}
 }

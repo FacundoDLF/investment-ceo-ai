@@ -108,7 +108,7 @@ export async function executeClosePosition(args: string): Promise<any> {
     });
 
   } catch (error: any) {
-    console.error('Error en close_position:', error);
+    console.error(`❌ Error en close_position: ${error.message}`);
     return JSON.stringify({ error: error.message });
   }
 }

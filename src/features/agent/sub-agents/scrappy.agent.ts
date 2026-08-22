@@ -54,7 +54,7 @@ Tu estado actual:
 
 Reglas Críticas:
 1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad (usa tu intuición rápida).
-2. Si tienes posición y el PnL es > 0.15% (profit), CIERRA inmediatamente para asegurar ganancia.
+2. Si tienes posición y el PnL es > 0.03% (profit), CIERRA inmediatamente para asegurar ganancia.
 3. Si el PnL es < -0.3% (loss), CIERRA inmediatamente (Stop Loss estricto).
 4. No envíes explicaciones largas. Responde SÓLO ejecutando la herramienta 'scalp_action'.`;
 

@@ -77,3 +77,9 @@
 * **Contexto:** Si el LLM "alucinaba" y ponía un string vacío o un valor inválido en el JSON de una Tool, el esquema de Zod lanzaba un Throw que detenía el proceso de Node.js.
 * **Solución:** En las herramientas (como `execute-trade.tool.ts`) usamos `z.coerce.number()` y capturamos la validación con `.safeParse()`. Si falla, devolvemos `JSON.stringify({ error: "Validation Error", details: parsedResult.error.issues })`.
 * **REGLA:** El LLM es capaz de autocorregirse si le devuelves el error en texto. NUNCA lances un `throw` por un error de sintaxis del modelo; devuélvele un objeto de error para que lo intente nuevamente en el mismo ciclo.
+
+### [ISSUE] Contaminación de consola por errores asíncronos en Tool Calls (Ej: current position is zero, cannot fix reduce-only order qty)
+* **Contexto:** El CEO Agent decide cerrar una posición usando la herramienta `close_position`. En el breve lapso de tiempo entre que el CEO tomó la decisión y ejecutó la herramienta, el Broker (Bybit) cerró la posición automáticamente (por Stop Loss o Take Profit).
+* **Problema:** El adaptador de Bybit intenta enviar una orden `reduceOnly: true` para una posición que ya es 0. Bybit devuelve error, el adaptador lanza un Throw, y la herramienta captura el error pero imprime el stack trace completo con `console.error(error)` ensuciando gravemente los logs de la consola del usuario.
+* **Solución:** En `close-position.tool.ts` se modificó el bloque catch para imprimir únicamente un string amigable `console.error('❌ Error en close_position: ' + error.message)` sin el stack trace completo.
+* **REGLA:** Las herramientas (tools) llamadas por agentes NUNCA deben imprimir stack traces completos (`console.error(error)`) en caso de errores operativos de API. Siempre deben formatear el error como texto simple para mantener la estética de la consola y devolver el JSON del error al LLM.

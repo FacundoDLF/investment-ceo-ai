@@ -125,7 +125,7 @@ export class BybitAdapter implements IVenueAdapter {
       orderType: params.type === 'market' ? 'Market' : 'Limit',
       qty: params.qty.toString(),
       reduceOnly: params.reduceOnly || false,
-      timeInForce: 'GTC',
+      timeInForce: params.postOnly ? 'PostOnly' : 'GTC',
     };
 
     if (params.type === 'limit' && params.limitPrice) {
@@ -237,6 +237,41 @@ export class BybitAdapter implements IVenueAdapter {
     };
   }
 
+  // Cache estático para no re-consultar la misma info del instrumento en HFT
+  private static instrumentInfoCache: Record<string, { qtyStep: number; minOrderQty: number }> = {};
+
+  async getInstrumentInfo(symbol: string): Promise<{ qtyStep: number; minOrderQty: number }> {
+    if (BybitAdapter.instrumentInfoCache[symbol]) {
+      return BybitAdapter.instrumentInfoCache[symbol];
+    }
+
+    const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
+    const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
+
+    const response = await fetch(`${baseUrl}/v5/market/instruments-info?category=linear&symbol=${symbol}`);
+    if (!response.ok) {
+      throw new Error(`Bybit Instruments Info API error: ${response.status}`);
+    }
+
+    const json = await response.json();
+    if (json.retCode !== 0) {
+      throw new Error(`Bybit API Error: ${json.retMsg}`);
+    }
+
+    const list = json.result?.list || [];
+    if (list.length === 0) {
+      throw new Error(`No instrument info found for symbol: ${symbol}`);
+    }
+
+    const info = list[0];
+    const qtyStep = parseFloat(info.lotSizeFilter?.qtyStep || '0.001');
+    const minOrderQty = parseFloat(info.lotSizeFilter?.minOrderQty || '0.001');
+
+    const result = { qtyStep, minOrderQty };
+    BybitAdapter.instrumentInfoCache[symbol] = result;
+    return result;
+  }
+
   async executeCashOut(amount: number, destination: string): Promise<string> {
     console.log(`[Bybit] Ejecutando cash-out de $${amount} hacia ${destination}`);
     return 'mock_tx_id_bybit';
@@ -320,6 +355,7 @@ export class BybitAdapter implements IVenueAdapter {
     return allPositions.map((pos: any) => ({
       symbol: pos.symbol,
       qty: parseFloat(pos.size || '0'),
+      side: pos.side?.toLowerCase() === 'buy' ? 'buy' : (pos.side?.toLowerCase() === 'sell' ? 'sell' : undefined),
       marketValue: parseFloat(pos.positionValue || '0'),
       unrealizedPl: parseFloat(pos.unrealisedPnl || '0'),
       unrealizedPlPc: parseFloat(pos.positionValue) > 0 ? (parseFloat(pos.unrealisedPnl) / parseFloat(pos.positionValue)) : 0,
@@ -327,7 +363,57 @@ export class BybitAdapter implements IVenueAdapter {
       avgEntryPrice: parseFloat(pos.avgPrice || '0'),
     }));
   }
+  async cancelAllOrders(symbol: string, category: 'linear' | 'spot' = 'linear'): Promise<void> {
+    const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
+    const apiKey = useTestnet ? process.env.BYBIT_DEMO_API_KEY : process.env.BYBIT_API_KEY;
+    const secretKey = useTestnet ? process.env.BYBIT_DEMO_API_SECRET : process.env.BYBIT_API_SECRET;
+    const privateKeyPath = useTestnet ? undefined : process.env.BYBIT_API_PRIVATE_KEY_PATH;
 
+    const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
+
+    if (!apiKey) return;
+
+    const payload = { category, symbol };
+    const payloadStr = JSON.stringify(payload);
+    const timestamp = Date.now().toString();
+    const recvWindow = '5000';
+    const signString = timestamp + apiKey + recvWindow + payloadStr;
+    
+    let signature = '';
+    if (secretKey) {
+      signature = crypto.createHmac('sha256', secretKey).update(signString).digest('hex');
+    } else if (privateKeyPath) {
+      const fs = require('fs');
+      try {
+        const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        const sign = crypto.createSign('SHA256');
+        sign.update(signString);
+        signature = sign.sign(privateKey, 'base64');
+      } catch (err: any) {
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/v5/order/cancel-all`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-BAPI-API-KEY': apiKey,
+          'X-BAPI-TIMESTAMP': timestamp,
+          'X-BAPI-RECV-WINDOW': recvWindow,
+          'X-BAPI-SIGN': signature,
+        },
+        body: payloadStr,
+      });
+
+      if (!response.ok) {
+        console.warn('Bybit cancelAllOrders falló a nivel HTTP:', response.status);
+      }
+    } catch (e) {
+      console.warn('Fallo silencioso cancelando órdenes', e);
+    }
+  }
   async getClosedPositionInfo(symbol: string): Promise<{ reason: string; closedPnl: number } | null> {
     const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
     const apiKey = useTestnet ? process.env.BYBIT_DEMO_API_KEY : process.env.BYBIT_API_KEY;

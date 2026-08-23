@@ -23,11 +23,13 @@ export interface OrderParams {
   stopLoss?: number;
   takeProfit?: number;
   reduceOnly?: boolean;
+  postOnly?: boolean;
 }
 
 export interface Position {
   symbol: string;
   qty: number;
+  side?: 'buy' | 'sell';
   marketValue: number;
   unrealizedPl: number;
   unrealizedPlPc: number;
@@ -56,9 +58,14 @@ export interface IVenueAdapter {
   /**
    * Obtiene el precio actual (Bid/Ask) del mercado para un instrumento.
    * @param symbol Símbolo del activo (ej. 'AAPL', 'BTCUSDT').
-   * @returns Bid y Ask actuales.
    */
   getMarketPrice(symbol: string): Promise<{ bid: number; ask: number }>;
+
+  /**
+   * Obtiene la información del instrumento (tamaño de lote, decimales permitidos, etc).
+   * @param symbol Símbolo del activo (ej. 'BTCUSDT').
+   */
+  getInstrumentInfo(symbol: string): Promise<{ qtyStep: number; minOrderQty: number }>;
 
   /**
    * Ejecuta una orden de compra o venta en el broker.
@@ -80,6 +87,13 @@ export interface IVenueAdapter {
    * @returns Un array de posiciones.
    */
   getOpenPositions(): Promise<Position[]>;
+
+  /**
+   * Cancela todas las órdenes activas (pendientes) para un símbolo.
+   * @param symbol Símbolo del activo.
+   * @param category Categoría del activo (opcional).
+   */
+  cancelAllOrders?(symbol: string, category?: 'linear' | 'spot'): Promise<void>;
 
   /**
    * Obtiene información sobre una posición cerrada recientemente.

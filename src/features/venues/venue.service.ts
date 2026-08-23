@@ -29,6 +29,16 @@ export async function getMarketPrice(venueName: VenueName, symbol: string): Prom
   return await adapter.getMarketPrice(symbol);
 }
 
+export async function getInstrumentInfo(venueName: VenueName, symbol: string): Promise<{ qtyStep: number; minOrderQty: number }> {
+  const adapter = venueRegistry[venueName];
+  
+  if (!adapter) {
+    throw new Error(`Venue no soportado: ${venueName}`);
+  }
+  
+  return await adapter.getInstrumentInfo(symbol);
+}
+
 export async function executeOrder(venueName: VenueName, params: OrderParams): Promise<any> {
   const adapter = venueRegistry[venueName];
   
@@ -47,6 +57,18 @@ export async function getUnifiedPositions(venueName: VenueName): Promise<Positio
   }
   
   return await adapter.getOpenPositions();
+}
+
+export async function cancelAllOrders(venueName: VenueName, symbol: string, category: 'linear' | 'spot' = 'linear'): Promise<void> {
+  const adapter = venueRegistry[venueName];
+  
+  if (!adapter) {
+    throw new Error(`Venue no soportado: ${venueName}`);
+  }
+  
+  if (adapter.cancelAllOrders) {
+    await adapter.cancelAllOrders(symbol, category);
+  }
 }
 
 export async function getClosedPositionInfo(venueName: VenueName, symbol: string): Promise<{ reason: string; closedPnl: number } | null> {

@@ -39,6 +39,15 @@ export class AlpacaAdapter implements IVenueAdapter {
     };
   }
 
+  async getInstrumentInfo(symbol: string): Promise<{ qtyStep: number; minOrderQty: number }> {
+    // Alpaca usa acciones fraccionarias para stocks (0.0001) y crypto (0.0001).
+    // Devolvemos valores seguros genéricos.
+    return {
+      qtyStep: 0.0001,
+      minOrderQty: 0.0001
+    };
+  }
+
   async executeOrder(params: OrderParams): Promise<any> {
     const apiKey = process.env.ALPACA_API_KEY_ID;
     const secretKey = process.env.ALPACA_API_SECRET_KEY;
@@ -168,5 +177,9 @@ export class AlpacaAdapter implements IVenueAdapter {
       currentPrice: parseFloat(pos.current_price),
       avgEntryPrice: parseFloat(pos.avg_entry_price),
     }));
+  }
+
+  async cancelAllOrders(symbol: string, category: 'linear' | 'spot' = 'linear'): Promise<void> {
+    console.warn(`[Alpaca] cancelAllOrders not implemented yet for ${symbol}`);
   }
 }

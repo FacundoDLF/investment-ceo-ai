@@ -9,7 +9,7 @@ import { runQuantAgent } from '@/features/agent/sub-agents/quant.agent';
 import { runMarketScanner } from '@/features/agent/sub-agents/market-scanner.agent';
 import { StateService } from '@/features/agent/services/state.service';
 import { prisma } from '@/shared/lib/prisma';
-import { getUnifiedBalance, getUnifiedPositions, getClosedPositionInfo, VenueName } from '@/features/venues/venue.service';
+import { getUnifiedBalance, getUnifiedPositions, getClosedPositionInfo, VenueName, executeOrder, cancelAllOrders } from '@/features/venues/venue.service';
 import { DAMAGE_CONTROL_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { startScrappyDaemon } from './scrappy.loop';
 import { ModelRouter } from '@/shared/constants/models';
@@ -118,6 +118,50 @@ async function runDaemonIteration(mode?: string) {
       }
     }
     console.log('');
+
+    // EMERGENCY CIRCUIT BREAKER (-25%)
+    if (pnlPercentage <= -0.25) {
+      console.log(`\n${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨🚨 ALERTA ROJA NUCLEAR: EMERGENCY LIQUIDATION (-25% PATRIMONIO) 🚨🚨${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.RED}Ejecutando Botón de Pánico: Apagando agentes y liquidando todo a Market.${ANSI_COLORS.RESET}`);
+      
+      StateService.setScrappyConfig(false);
+
+      for (const p of positions) {
+        if (p.qty > 0) {
+          console.log(`[Circuit Breaker] Cancelando órdenes y cerrando ${p.symbol}...`);
+          await cancelAllOrders(venue, p.symbol, 'linear').catch(() => {});
+          await executeOrder(venue, {
+            symbol: p.symbol,
+            side: p.side === 'buy' ? 'sell' : 'buy',
+            qty: p.qty,
+            type: 'market',
+            category: 'linear',
+            reduceOnly: true
+          }).catch(() => {});
+        }
+      }
+
+      if (balance.coins) {
+        for (const c of balance.coins) {
+          if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
+            const spotSymbol = `${c.symbol}USDT`;
+            await cancelAllOrders(venue, spotSymbol, 'spot').catch(() => {});
+            await executeOrder(venue, {
+              symbol: spotSymbol,
+              side: 'sell',
+              qty: c.balance,
+              type: 'market',
+              category: 'spot'
+            }).catch(() => {});
+          }
+        }
+      }
+
+      console.log(`${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨 LIQUIDACIÓN COMPLETADA. EL SISTEMA SE CONGELARÁ (FROZEN) POR SEGURIDAD. 🚨${ANSI_COLORS.RESET}`);
+      while (true) {
+        await new Promise(r => setTimeout(r, 60000));
+      }
+    }
 
     // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
     if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {

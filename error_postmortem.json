@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-22T21:16:10.827Z",
+  "timestamp": "2026-08-23T03:29:45.421Z",
   "uid": "groq::openai/gpt-oss-20b",
   "model": "openai/gpt-oss-20b",
   "provider": "groq",
   "status": 400,
-  "error": "400 {\"error\":{\"message\":\"Tool call validation failed: tool call validation failed: attempted to call tool 'skalp_action' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"skalp_action\\\", \\\"arguments\\\": {\\\"action\\\":\\\"HOLD\\\"}}\"}}"
+  "error": "400 {\"error\":{\"message\":\"Tool call validation failed: tool call validation failed: attempted to call tool 'scarp_action' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"scarp_action\\\", \\\"arguments\\\": {\\\"action\\\":\\\"OPEN_SHORT\\\"}}\"}}"
 }

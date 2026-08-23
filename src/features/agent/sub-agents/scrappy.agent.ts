@@ -1,15 +1,17 @@
 import { createChatCompletionWithRetry } from '@/shared/lib/groq';
-import { executeOrder, getMarketPrice } from '@/features/venues/venue.service';
+import { executeOrder, getMarketPrice, getInstrumentInfo } from '@/features/venues/venue.service';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { StateService } from '../services/state.service';
 import { prisma } from '@/shared/lib/prisma';
 
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 
-// Estado en memoria de Scrappy
-let currentScalpPosition: { symbol: string, side: 'buy' | 'sell', entryPrice: number, qty: number } | null = null;
+import type { Position } from '@/shared/interfaces/venue.adapter';
+import { cancelAllOrders, getUnifiedPositions } from '@/features/venues/venue.service';
+
 let lastLogTime = 0;
 let lastHeartbeatTime = 0;
+let lastActionTime = 0;
 
 export async function runScrappyIteration() {
   const config = StateService.getScrappyState();
@@ -22,41 +24,41 @@ export async function runScrappyIteration() {
     const spread = priceData.ask - priceData.bid;
     const spreadPct = (spread / midPrice) * 100;
 
-    let pnlPct = 0;
-    if (currentScalpPosition) {
-      if (currentScalpPosition.symbol !== symbol) {
-        // El CEO cambió de activo, deberíamos cerrar el actual (Liquidación forzada).
-        currentScalpPosition = null;
-      } else {
-        const exitPrice = currentScalpPosition.side === 'buy' ? priceData.bid : priceData.ask;
-        pnlPct = currentScalpPosition.side === 'buy'
-          ? ((exitPrice - currentScalpPosition.entryPrice) / currentScalpPosition.entryPrice) * 100
-          : ((currentScalpPosition.entryPrice - exitPrice) / currentScalpPosition.entryPrice) * 100;
+    // 1. Obtener estado real del broker (STATELESS)
+    const positions = await getUnifiedPositions('bybit');
+    const myPosition = positions.find((p: Position) => p.symbol === symbol && p.qty > 0);
 
-        // Log "Anormal" (ganancia o pérdida notable > 0.5%)
-        if (Math.abs(pnlPct) >= 0.5) {
-          const now = Date.now();
-          if (now - lastLogTime > 60000) { // No floodear si se queda colgado
-            console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🚨 RENTABILIDAD ANORMAL DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}`);
-            lastLogTime = now;
-          }
+    let pnlPct = 0;
+    if (myPosition) {
+      // Bybit linear positions tienen side, si no lo inferimos del PnL
+      pnlPct = myPosition.unrealizedPlPc * 100;
+
+      // Log "Anormal" (ganancia o pérdida notable > 0.5%)
+      if (Math.abs(pnlPct) >= 0.5) {
+        const now = Date.now();
+        if (now - lastLogTime > 60000) { // No floodear
+          console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🚨 RENTABILIDAD ANORMAL DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}`);
+          lastLogTime = now;
         }
       }
+    } else {
+      // No tenemos posición. Limpiamos cualquier orden Límite huérfana
+      await cancelAllOrders('bybit', symbol, 'linear').catch(() => { });
     }
 
     const systemPrompt = `Eres Scrappy, un Scalp Trader HFT ultrarrápido.
 Tu objetivo es acumular micro-ganancias. Operas en Bybit. Presupuesto asignado: $${config.budget}.
 Tu estado actual:
-- Posición abierta: ${currentScalpPosition ? `${currentScalpPosition.side.toUpperCase()} en ${currentScalpPosition.entryPrice}` : 'NINGUNA'}
+- Posición abierta: ${myPosition ? `${myPosition.side?.toUpperCase() || 'ACTIVA'} en ${myPosition.avgEntryPrice}` : 'NINGUNA'}
 - PnL Flotante: ${pnlPct.toFixed(3)}%
 - Activo objetivo: ${symbol}
 - Precio Actual: BID ${priceData.bid} / ASK ${priceData.ask} / SPREAD ${spreadPct.toFixed(4)}%
 
 Reglas Críticas:
-1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad (usa tu intuición rápida).
-2. Si tienes posición y el PnL es > 0.03% (profit), CIERRA inmediatamente para asegurar ganancia.
-3. Si el PnL es < -0.3% (loss), CIERRA inmediatamente (Stop Loss estricto).
-4. No envíes explicaciones largas. Responde SÓLO ejecutando la herramienta 'scalp_action'.`;
+1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad.
+2. Si tienes posición y el PnL es >= +0.03% (profit), CIERRA inmediatamente para asegurar ganancia.
+3. Si el PnL es <= -0.30% (loss), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. No cierres en pérdida, ¡promedia!
+4. No envíes explicaciones. Responde SÓLO ejecutando 'scalp_action'.`;
 
     const scalpTool: ChatCompletionTool = {
       type: 'function',
@@ -87,24 +89,15 @@ Reglas Críticas:
         const args = JSON.parse(tc.function.arguments);
         const action = args.action;
 
-        // Logging visual amigable (Modo Perro de Caza)
-        if (action === 'OPEN_LONG' || action === 'OPEN_SHORT') {
-          console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} ⚡ ¡Grrr! Atacó con un ${action === 'OPEN_LONG' ? 'LONG' : 'SHORT'} en ${symbol} a $${midPrice.toFixed(2)}`);
-        } else if (action === 'CLOSE_POSITION') {
-          if (pnlPct > 0) {
-            console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🥩 ¡Guau! Se escapó con ${symbol} (Premio: +${pnlPct.toFixed(2)}%)`);
-          } else {
-            console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕‍🦺 ¡Yikes! Huyó de ${symbol} (Pérdida: ${pnlPct.toFixed(2)}%)`);
-          }
-        } else {
+        // Logging
+        // Heartbeat Logging
+        if (action === 'HOLD' || action === 'WAIT') {
           const now = Date.now();
-          // Latido cada 30 segundos si está inactivo o holdeando
           if (now - lastHeartbeatTime > 30000) {
-            if (currentScalpPosition) {
-              const currentPrice = currentScalpPosition.side === 'buy' ? priceData.bid : priceData.ask;
-              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${currentScalpPosition.side.toUpperCase()}):`);
-              console.log(`${ANSI_COLORS.GRAY}  ├─ Entrada : $${currentScalpPosition.entryPrice}${ANSI_COLORS.RESET}`);
-              console.log(`${ANSI_COLORS.GRAY}  ├─ Actual  : $${currentPrice.toFixed(2)}${ANSI_COLORS.RESET}`);
+            if (myPosition) {
+              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${myPosition.side?.toUpperCase()}):`);
+              console.log(`${ANSI_COLORS.GRAY}  ├─ Entrada : $${myPosition.avgEntryPrice}${ANSI_COLORS.RESET}`);
+              console.log(`${ANSI_COLORS.GRAY}  ├─ Actual  : $${priceData.bid.toFixed(2)}${ANSI_COLORS.RESET}`);
               console.log(`${ANSI_COLORS.GRAY}  └─ Var %     : ${pnlPct >= 0 ? ANSI_COLORS.GREEN + '+' : ANSI_COLORS.RED}${pnlPct.toFixed(3)}%${ANSI_COLORS.RESET}`);
             } else {
               console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);
@@ -113,63 +106,108 @@ Reglas Críticas:
           }
         }
 
-        await executeScalpAction(action, symbol, config.budget, midPrice, pnlPct);
+        await executeScalpAction(action, symbol, config.budget, priceData, myPosition, pnlPct);
       }
     }
 
   } catch (error: any) {
-    // Silencioso. En scalping, si hay timeout de red, lo intentamos al siguiente segundo.
+    // Fail silently in loop
   }
 }
 
-async function executeScalpAction(action: string, symbol: string, budget: number, currentPrice: number, pnlPct: number) {
+async function executeScalpAction(
+  action: string,
+  symbol: string,
+  budget: number,
+  priceData: { bid: number, ask: number },
+  myPosition: Position | undefined,
+  pnlPct: number
+) {
   try {
     if (action === 'HOLD' || action === 'WAIT') return;
 
-    if (action === 'CLOSE_POSITION' && currentScalpPosition) {
-      // Mandar orden de cierre real
-      await executeOrder('bybit', {
-        symbol: symbol,
-        side: currentScalpPosition.side === 'buy' ? 'sell' : 'buy',
-        qty: currentScalpPosition.qty,
-        type: 'market',
-        category: 'linear'
-      }).catch(() => { }); // Ignorar errores de red para no frenar
+    if (action === 'CLOSE_POSITION' && myPosition) {
+      if (pnlPct >= 0) {
+        // TAKE PROFIT: LIMIT POST-ONLY MAKER ORDER
+        const limitPrice = myPosition.side === 'buy' ? priceData.ask : priceData.bid;
 
-      // Imprimir log solo si la ganancia/pérdida es anormal (> 0.5%)
+        await executeOrder('bybit', {
+          symbol: symbol,
+          side: myPosition.side === 'buy' ? 'sell' : 'buy',
+          qty: myPosition.qty,
+          type: 'limit',
+          limitPrice: limitPrice,
+          category: 'linear',
+          postOnly: true,
+          reduceOnly: true
+        }).catch((e) => {
+          console.log(`${ANSI_COLORS.RED}[Scrappy] Error Take Profit: ${e.message}${ANSI_COLORS.RESET}`);
+        });
+
+      } else {
+        // En teoría, el DCA evitará que entremos aquí a menos que el LLM se asuste.
+        // Pero si decide cerrar en pérdida, usamos Taker.
+        await cancelAllOrders('bybit', symbol, 'linear').catch(() => { });
+
+        await executeOrder('bybit', {
+          symbol: symbol,
+          side: myPosition.side === 'buy' ? 'sell' : 'buy',
+          qty: myPosition.qty,
+          type: 'market',
+          category: 'linear',
+          reduceOnly: true
+        }).catch(() => { });
+      }
+
       if (Math.abs(pnlPct) >= 0.5) {
         console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
-        // Registrar en DB para el historial
         await prisma.executionLog.create({
-          data: {
-            eventType: 'SCALP_TRADE_CLOSED',
-            venue: 'bybit',
-            symbol,
-            success: true,
-            details: JSON.stringify({ pnlPct })
-          }
+          data: { eventType: 'SCALP_TRADE_CLOSED', venue: 'bybit', symbol, success: true, details: JSON.stringify({ pnlPct }) }
         });
       }
-      currentScalpPosition = null;
       return;
     }
 
-    if ((action === 'OPEN_LONG' || action === 'OPEN_SHORT') && !currentScalpPosition) {
-      // Calcular cantidad de monedas según presupuesto
+    if (action === 'OPEN_LONG' || action === 'OPEN_SHORT') {
+      const now = Date.now();
+      if (now - lastActionTime < 5000) {
+        return; // Cooldown de 5 segundos para evitar spam
+      }
+
+      const currentPrice = action === 'OPEN_LONG' ? priceData.ask : priceData.bid;
       let qty = budget / currentPrice;
 
-      // Normalizar qty para Bybit
-      if (symbol === 'BTCUSDT') {
-        qty = Math.floor(qty * 100000) / 100000;
-      } else if (symbol === 'ETHUSDT') {
-        qty = Math.floor(qty * 10000) / 10000;
-      } else {
-        qty = Math.floor(qty * 100) / 100;
+      try {
+        const info = await getInstrumentInfo('bybit', symbol);
+        // Calculate precision to avoid float math errors like 0.12900000000000003
+        const precision = info.qtyStep.toString().split('.')[1]?.length || 0;
+        qty = Number((Math.floor(qty / info.qtyStep) * info.qtyStep).toFixed(precision));
+      } catch (e: any) {
+        console.log(`${ANSI_COLORS.RED}[Scrappy] Error obteniendo info del instrumento: ${e.message}${ANSI_COLORS.RESET}`);
+        // Fallback genérico por si falla la API
+        if (symbol === 'BTCUSDT') {
+          qty = Math.floor(qty * 1000) / 1000;
+        } else if (symbol === 'ETHUSDT') {
+          qty = Math.floor(qty * 100) / 100;
+        } else {
+          qty = Math.floor(qty); // Asumimos enteros para el resto en fallback
+        }
       }
 
       if (qty <= 0) return;
 
       const side = action === 'OPEN_LONG' ? 'buy' : 'sell';
+      const sideStr = action === 'OPEN_LONG' ? 'LONG' : 'SHORT';
+      const pnlColor = pnlPct >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+      const sign = pnlPct > 0 ? '+' : '';
+
+      if (myPosition) {
+        // DCA (Dollar Cost Averaging)
+        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 📉 ¡Promediando a la baja (DCA)! Comprando más ${symbol} a $${currentPrice.toFixed(2)} (PnL Actual: ${pnlColor}${sign}${pnlPct.toFixed(2)}%${ANSI_COLORS.RESET})`);
+        await cancelAllOrders('bybit', symbol, 'linear').catch(() => { }); // Limpiar TPs antiguos
+      } else {
+        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} ⚡ ¡Grrr! Atacó con un ${sideStr} en ${symbol} a $${currentPrice.toFixed(2)} (Entrada Inicial)`);
+      }
 
       await executeOrder('bybit', {
         symbol: symbol,
@@ -177,16 +215,14 @@ async function executeScalpAction(action: string, symbol: string, budget: number
         qty: qty,
         type: 'market',
         category: 'linear'
-      }).catch(() => { }); // Fallo silencioso
+      }).catch((e) => { 
+        console.log(`${ANSI_COLORS.RED}[Scrappy] Error abriendo posición: ${e.message}${ANSI_COLORS.RESET}`);
+      });
 
-      currentScalpPosition = {
-        symbol,
-        side,
-        entryPrice: currentPrice,
-        qty
-      };
+      lastActionTime = now;
     }
-  } catch (e) {
-    // Fail silently in HFT loop
+  } catch (e: any) {
+    // Fail silently in HFT loop unless it's a critical error
+    // console.log("HFT Error:", e.message);
   }
 }

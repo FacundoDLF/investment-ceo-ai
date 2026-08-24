@@ -327,6 +327,14 @@ async function runDaemonIteration(mode?: string) {
       }
 
       const scrappyConf = StateService.getScrappyState();
+      if (scrappyConf.active && venue === 'bybit') {
+        const scrappyReport = await MissionService.getScrappyReport();
+        if (scrappyReport && scrappyReport !== "Sin reportes recientes. Esperando órdenes.") {
+           marketContext += `\n\n**MENSAJE URGENTE DE SCRAPPY (Ejecutor HFT):**\n${scrappyReport}\n(Evalúa si quieres apagarlo, subirle el budget, o dejarlo corriendo solo).`;
+           await MissionService.setScrappyReport("Sin reportes recientes. Esperando órdenes."); // Borrar buzón tras leerlo
+        }
+      }
+
       const scrappyExclusion = scrappyConf.active && venue === 'bybit' ? ` IGNORA y NO CIERRES la posición en ${scrappyConf.targetAsset} porque es gestionada independientemente por el bot HFT Scrappy (no requiere thesis).` : '';
 
       const agentPrompt = isDamageControl 

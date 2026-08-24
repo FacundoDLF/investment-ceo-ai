@@ -162,8 +162,14 @@ async function executeScalpAction(
       }
 
       const realizedPnl = myPosition.unrealizedPl || 0;
-      await MissionService.addScrappyPnL(realizedPnl);
+      const accumulatedPnL = await MissionService.addScrappyPnL(realizedPnl);
       await MissionService.addLifetimeScrappyPnL(realizedPnl);
+
+      if (accumulatedPnL >= config.target) {
+        console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 [Scrappy] ¡SPRINT COMPLETADO! Meta de $${config.target} alcanzada (Total: $${accumulatedPnL.toFixed(2)}). Transfiriendo fondos y reiniciando cacería...${ANSI_COLORS.RESET}`);
+        await MissionService.resetScrappyPnL();
+        await MissionService.setScrappyReport(`¡SPRINT COMPLETADO! Se alcanzó la meta de $${config.target}. He consolidado $${accumulatedPnL.toFixed(2)} de ganancias en el balance del Exchange y he reiniciado un nuevo sprint con el mismo presupuesto. Sigo operando activamente a la espera de nuevas órdenes si lo deseas.`);
+      }
 
       if (Math.abs(pnlPct) >= 0.5) {
         const msgColor = pnlPct > 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.WHITE;

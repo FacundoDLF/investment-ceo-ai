@@ -159,6 +159,12 @@
 * **Solución:** En `scrappy.agent.ts`, se ajustó el `tool_choice` explícitamente a `{ type: 'function', function: { name: 'scalp_action' } }` para obligarlo estructuralmente, y se agregó una regla muy estricta al System Prompt: *"NO PIENSES. NO RAZONES. NO EXPLIQUES NADA. Tu ÚNICA salida permitida es invocar la herramienta"*
 * **REGLA:** NUNCA permitas que sub-agentes de ejecución rápida que requieran llamadas a herramientas (Tool Calls) en modelos OSS usen `tool_choice: 'auto'` sin un System Prompt ultra restrictivo. Si ocurre un Error 400 de parsing, debes forzar el `tool_choice` e inyectar instrucciones anti-razonamiento.
 
+### [ISSUE] Error 422 en Alpaca por Acciones Fraccionarias en After-Hours
+* **Contexto:** El CEO intentó ejecutar una orden de compra en Alpaca durante el estado `AFTER_HOURS_REVIEW` con una cantidad fraccionaria (`qty: 8.164`).
+* **Problema:** Alpaca rechaza las órdenes fraccionarias si no son `DAY` orders. En After-Hours, las órdenes suelen ser extendidas o limitadas, por lo que la API arrojó: `422 Unprocessable Entity - fractional orders must be DAY orders`.
+* **Solución:** Se documentó la restricción en el mandato del CEO para que sepa de antemano que no puede enviar cantidades con decimales si está operando fuera del horario regular.
+* **REGLA:** NUNCA permitas que el CEO o los agentes envíen órdenes con cantidades fraccionarias en Alpaca fuera del horario regular de mercado (Pre-Market o After-Hours). Deben redondear a números enteros.
+
 ### [ISSUE] El LLM se niega a operar (Safety Refusals)
 * **Contexto:** Modelos de IA base suelen rechazar peticiones de "comprar" o "vender" criptomonedas argumentando que no pueden dar asesoría financiera.
 * **Problema:** Esto rompe completamente el bucle autónomo del CEO.

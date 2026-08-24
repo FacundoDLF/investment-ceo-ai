@@ -368,26 +368,6 @@ async function runDaemonIteration(mode?: string) {
         console.log(`${LOG_PREFIX.AUDITORIA} ${titleMatch[1].trim()}${ANSI_COLORS.RESET}`);
       } else {
         console.log(`${LOG_PREFIX.AUDITORIA} Ciclo completado sin acciones.${ANSI_COLORS.RESET}`);
-        if (finalContent.length > 0) {
-          console.log(`\n${LOG_PREFIX.CEO_TRADER} ${ANSI_COLORS.CYAN}(Pensamiento Interno no estructurado):${ANSI_COLORS.RESET}`);
-          
-          let displayContent = finalContent;
-          if (displayContent.startsWith('{') && displayContent.includes('}')) {
-             try {
-                // Si accidentalmente devuelve un JSON (como el reporte del Experto SMART)
-                const parsed = JSON.parse(displayContent);
-                displayContent = JSON.stringify(parsed, null, 2);
-             } catch(e) {}
-          }
-          
-          // Limpiar exceso de saltos de línea y truncar si es muy largo
-          displayContent = displayContent.replace(/\n{3,}/g, '\n\n').trim();
-          if (displayContent.length > 400) {
-              displayContent = displayContent.substring(0, 400) + `\n\n${ANSI_COLORS.GRAY}... [Texto truncado por longitud excesiva]${ANSI_COLORS.RESET}`;
-          }
-          
-          console.log(`${ANSI_COLORS.CYAN}${displayContent}${ANSI_COLORS.RESET}\n`);
-        }
       }
 
 

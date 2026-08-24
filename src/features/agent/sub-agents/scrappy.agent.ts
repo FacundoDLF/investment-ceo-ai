@@ -14,6 +14,11 @@ let lastLogTime = 0;
 let lastHeartbeatTime = 0;
 let lastActionTime = 0;
 
+// Trailing Stop State
+let trailingMaxPnl = 0;
+let trailingActive = false;
+let trailingDistance = 0.20;
+
 export async function runScrappyIteration() {
   const config = StateService.getScrappyState();
   if (!config.active) return; // Apagado
@@ -34,10 +39,26 @@ export async function runScrappyIteration() {
       // Bybit linear positions tienen side, si no lo inferimos del PnL
       pnlPct = myPosition.unrealizedPlPc * 100;
 
+      // 🛡️ ALGORITMO DE TRAILING STOP (Cero Latencia, antes del LLM)
+      if (pnlPct > trailingMaxPnl) {
+        trailingMaxPnl = pnlPct; // Actualizar High Water Mark
+      }
+      
+      if (trailingActive && (trailingMaxPnl - pnlPct >= trailingDistance)) {
+        console.log(`${ANSI_COLORS.GREEN}🔥 [TRAILING STOP EXECUTED] Retroceso detectado de ${trailingDistance}%. ¡Tomando Ganancias Inmediatamente! (Max: +${trailingMaxPnl.toFixed(2)}%, Actual: +${pnlPct.toFixed(2)}%)${ANSI_COLORS.RESET}`);
+        trailingActive = false; // Apagar trailing hasta próxima decisión
+        trailingMaxPnl = 0;     // Resetear marca de agua
+        await executeScalpAction('CLOSE_POSITION', symbol, config, priceData, myPosition, pnlPct, true);
+        return; // Detener iteración para no invocar al LLM
+      }
+
       const now = Date.now();
       if (now - lastLogTime > 30000) { // Logging táctico cada 30s
-        if (pnlPct >= 0.50 && pnlPct < 0.80) {
-          console.log(`${ANSI_COLORS.GREEN}🟢 [Scrappy Radar] Zona de Tolerancia alcanzada (+${pnlPct.toFixed(2)}%). Evaluando Take Profit anticipado...${ANSI_COLORS.RESET}`);
+        if (trailingActive) {
+           console.log(`${ANSI_COLORS.CYAN}🏃‍♂️ [Scrappy] Modo Trailing Activo. Persiguiendo precio. Max: +${trailingMaxPnl.toFixed(2)}% | Actual: +${pnlPct.toFixed(2)}% (Gatillo si baja a +${(trailingMaxPnl - trailingDistance).toFixed(2)}%)${ANSI_COLORS.RESET}`);
+           lastLogTime = now;
+        } else if (pnlPct >= 0.50 && pnlPct < 0.80) {
+          console.log(`${ANSI_COLORS.GREEN}🟢 [Scrappy Radar] Zona de Tolerancia alcanzada (+${pnlPct.toFixed(2)}%). Evaluando Take Profit o Trailing Stop...${ANSI_COLORS.RESET}`);
           lastLogTime = now;
         } else if (pnlPct <= -1.00 && pnlPct > -1.50) {
           console.log(`${ANSI_COLORS.RED}🔴 [Scrappy Radar] Drawdown profundo detectado (${pnlPct.toFixed(2)}%). Acercándose a zona DCA (-1.50%)...${ANSI_COLORS.RESET}`);
@@ -48,7 +69,9 @@ export async function runScrappyIteration() {
         }
       }
     } else {
-      // No tenemos posición. Limpiamos cualquier orden Límite huérfana
+      // No tenemos posición. Resetear estado de trailing y limpiar órdenes
+      trailingActive = false;
+      trailingMaxPnl = 0;
       await cancelAllOrders('bybit', symbol, 'linear').catch(() => { });
     }
 
@@ -70,7 +93,9 @@ Tu estado actual:
 
 Reglas Críticas:
 1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad.
-2. Si tienes posición y el PnL Flotante Bruto es >= +0.80% (profit óptimo), CIERRA inmediatamente. [TOLERANCIA DINÁMICA]: Si estás por encima de +0.50% y notas que el mercado pierde fuerza o lateraliza, tienes autorización para CERRAR anticipadamente y asegurar la ganancia para evitar el Síndrome del Casi.
+2. Si tienes posición y el PnL Flotante Bruto es >= +0.80% (profit óptimo), DECIDE: 
+   - Si el mercado pierde fuerza, usa CLOSE_POSITION para asegurar ganancias ahora mismo.
+   - Si el mercado tiene fuerte impulso, usa ACTIVATE_TRAILING (con distance=0.20) para perseguir el precio hacia arriba.
 3. Si el PnL Flotante Bruto es <= -1.50% (loss profundo), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. Dale espacio al precio para respirar antes de intervenir. No cierres en pérdida.
 4. NO PIENSES. NO RAZONES. NO EXPLIQUES NADA.
 5. Tu ÚNICA salida permitida es invocar la herramienta 'scalp_action' INMEDIATAMENTE. No escribas texto antes ni después.`;
@@ -83,7 +108,8 @@ Reglas Críticas:
         parameters: {
           type: 'object',
           properties: {
-            action: { type: 'string', enum: ['OPEN_LONG', 'OPEN_SHORT', 'CLOSE_POSITION', 'HOLD', 'WAIT'] },
+            action: { type: 'string', enum: ['OPEN_LONG', 'OPEN_SHORT', 'CLOSE_POSITION', 'ACTIVATE_TRAILING', 'HOLD', 'WAIT'] },
+            distance: { type: 'number', description: 'Porcentaje de retroceso para el Trailing Stop (ej. 0.20)' }
           },
           required: ['action']
         }
@@ -104,7 +130,15 @@ Reglas Críticas:
         const args = JSON.parse(tc.function.arguments);
         const action = args.action;
 
-        // Logging
+        if (action === 'ACTIVATE_TRAILING') {
+          const dist = args.distance && args.distance >= 0.20 ? args.distance : 0.20;
+          trailingActive = true;
+          trailingDistance = dist;
+          trailingMaxPnl = pnlPct;
+          console.log(`${ANSI_COLORS.CYAN}🚀 [Scrappy] ¡Trailing Stop Activado por la IA! Persiguiendo precio con distancia de ${dist}%.${ANSI_COLORS.RESET}`);
+          return;
+        }
+
         // Heartbeat Logging
         if (action === 'HOLD' || action === 'WAIT') {
           const now = Date.now();
@@ -136,14 +170,15 @@ async function executeScalpAction(
   config: any,
   priceData: { bid: number, ask: number },
   myPosition: Position | undefined,
-  pnlPct: number
+  pnlPct: number,
+  isTrailingExecution: boolean = false
 ) {
   try {
     if (action === 'HOLD' || action === 'WAIT') return;
 
     if (action === 'CLOSE_POSITION' && myPosition) {
-      // 🛡️ SALVAGUARDA MATEMÁTICA: Prohibido Take Profit prematuro
-      if (pnlPct >= 0 && pnlPct < 0.50) {
+      // 🛡️ SALVAGUARDA MATEMÁTICA: Prohibido Take Profit prematuro (salvo que sea un Trailing Stop)
+      if (!isTrailingExecution && pnlPct >= 0 && pnlPct < 0.50) {
         return; // Anular orden silenciosamente
       }
       if (pnlPct >= 0) {

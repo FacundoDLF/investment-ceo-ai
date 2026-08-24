@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
-import { getUnifiedPositions, executeOrder, VenueName } from '@/features/venues/venue.service';
+import { getUnifiedPositions, executeOrder, VenueName, getInstrumentInfo } from '@/features/venues/venue.service';
 import { prisma } from '@/shared/lib/prisma';
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 import { MissionService } from '@/features/agent/services/mission.service';
@@ -53,15 +53,11 @@ export async function executeClosePosition(args: string): Promise<any> {
     const absQty = Math.abs(position.qty);
     let qtyToClose = (absQty * params.percentage) / 100;
 
-    // Normalizar qty para Bybit
+    // Normalizar qty para Bybit utilizando la API dinámica
     if (params.venue === 'bybit') {
-      if (params.symbol === 'BTCUSDT') {
-        qtyToClose = Math.floor(qtyToClose * 1000) / 1000;
-      } else if (params.symbol === 'ETHUSDT') {
-        qtyToClose = Math.floor(qtyToClose * 100) / 100;
-      } else {
-        qtyToClose = Math.floor(qtyToClose);
-      }
+      const info = await getInstrumentInfo(params.venue as VenueName, params.symbol);
+      const precision = info.qtyStep.toString().split('.')[1]?.length || 0;
+      qtyToClose = Number((Math.floor(qtyToClose / info.qtyStep) * info.qtyStep).toFixed(precision));
     }
 
     if (qtyToClose <= 0) {

@@ -54,178 +54,16 @@ let cachedScannerReport = "Aún no hay reporte del escáner de mercado.";
 
 let iterationCount = 0;
 let lastLoggedCoinsHash = "";
-let lastPositionsMap: Record<string, any> = {};
+let lastPositionsMap: Record<string, Record<string, any>> = { alpaca: {}, bybit: {} };
+const frozenVenues: Set<VenueName> = new Set();
 
 async function runDaemonIteration(mode?: string) {
   iterationCount++;
-  console.log(`\n${LOG_PREFIX.SISTEMA} Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'})...`);
+  const timestamp = DateTime.now().setZone('America/Argentina/Buenos_Aires').toFormat('dd/MM/yyyy HH:mm:ss');
+  console.log(`\n${LOG_PREFIX.SISTEMA} [${timestamp}] Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'})...`);
 
   try {
-    const venue: VenueName = mode === TRADING_MODES.CRYPTO ? VENUES.BYBIT : VENUES.ALPACA;
-    console.log(`${LOG_PREFIX.SISTEMA} Consultando estado de billetera real en ${venue}...`);
-    const balance = await getUnifiedBalance(venue);
-    const spot = balance.spotPower || 0;
-    const futures = balance.dayTradingPower || 0;
-    const hasCapital = spot >= 10 || futures >= 10;
-
-    let currentState: string;
-    let marketContext: string;
-    let isDamageControl = false;
-
-    // Calcular Unrealized PnL
-    const positions = await getUnifiedPositions(venue).catch(() => []);
-    
-    // Rastrear posiciones cerradas
-    if (iterationCount > 1) {
-      const currentSymbols = new Set(positions.map(p => p.symbol));
-      for (const [symbol, pos] of Object.entries(lastPositionsMap)) {
-        if (!currentSymbols.has(symbol)) {
-          const closedInfo = await getClosedPositionInfo(venue, symbol).catch(() => null);
-          const reason = closedInfo ? closedInfo.reason : 'Broker (Automático)';
-          const pnl = closedInfo ? closedInfo.closedPnl : 0;
-          const msgColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
-          const sign = pnl >= 0 ? '+' : '';
-          console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}🛎️ Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
-        }
-      }
-    }
-    
-    lastPositionsMap = {};
-    positions.forEach(p => lastPositionsMap[p.symbol] = p);
-
-    const totalUnrealizedPnL = positions.reduce((sum, p) => sum + (p.unrealizedPl || 0), 0);
-    const pnlPercentage = balance.cash > 0 ? totalUnrealizedPnL / balance.cash : 0;
-
-    const pnlColor = totalUnrealizedPnL >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
-    console.log(`${ANSI_COLORS.CYAN}  💰 ESTADO DE BILLETERA (${venue.toUpperCase()})${ANSI_COLORS.RESET}`);
-    console.log(`${ANSI_COLORS.GRAY}  ├─ Total Equity    : ${ANSI_COLORS.GREEN}$${balance.cash.toFixed(2)}${ANSI_COLORS.RESET}`);
-    console.log(`${ANSI_COLORS.GRAY}  ├─ Margin Balance  : ${ANSI_COLORS.GREEN}$${futures.toFixed(2)}${ANSI_COLORS.RESET}`);
-    console.log(`${ANSI_COLORS.GRAY}  ├─ Spot (Liquidez) : ${ANSI_COLORS.GREEN}$${spot.toFixed(2)}${ANSI_COLORS.RESET}`);
-    console.log(`${ANSI_COLORS.GRAY}  └─ Unrealized PnL  : ${pnlColor}$${totalUnrealizedPnL.toFixed(2)} (${(pnlPercentage * 100).toFixed(2)}%)${ANSI_COLORS.RESET}`);
-
-    // Dynamic logging of spot coins
-    if (balance.coins && balance.coins.length > 0) {
-      const currentCoinsHash = JSON.stringify(balance.coins);
-      if (currentCoinsHash !== lastLoggedCoinsHash) {
-        lastLoggedCoinsHash = currentCoinsHash;
-        console.log(`${ANSI_COLORS.CYAN}  🪙 PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
-        balance.coins.forEach((c, index) => {
-          const isLast = index === balance.coins!.length - 1;
-          const prefix = isLast ? '└─' : '├─';
-          const usdVal = c.usdValue !== undefined ? ` (~$${c.usdValue.toFixed(2)})` : '';
-          console.log(`${ANSI_COLORS.GRAY}  ${prefix} ${c.symbol.padEnd(6)}: ${ANSI_COLORS.GREEN}${c.balance}${ANSI_COLORS.GRAY}${usdVal}${ANSI_COLORS.RESET}`);
-        });
-      }
-    }
-    console.log('');
-
-    // EMERGENCY CIRCUIT BREAKER (-25%)
-    if (pnlPercentage <= -0.25) {
-      console.log(`\n${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨🚨 ALERTA ROJA NUCLEAR: EMERGENCY LIQUIDATION (-25% PATRIMONIO) 🚨🚨${ANSI_COLORS.RESET}`);
-      console.log(`${ANSI_COLORS.RED}Ejecutando Botón de Pánico: Apagando agentes y liquidando todo a Market.${ANSI_COLORS.RESET}`);
-      
-      StateService.setScrappyConfig(false);
-
-      for (const p of positions) {
-        if (p.qty > 0) {
-          console.log(`[Circuit Breaker] Cancelando órdenes y cerrando ${p.symbol}...`);
-          await cancelAllOrders(venue, p.symbol, 'linear').catch(() => {});
-          await executeOrder(venue, {
-            symbol: p.symbol,
-            side: p.side === 'buy' ? 'sell' : 'buy',
-            qty: p.qty,
-            type: 'market',
-            category: 'linear',
-            reduceOnly: true
-          }).catch(() => {});
-        }
-      }
-
-      if (balance.coins) {
-        for (const c of balance.coins) {
-          if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
-            const spotSymbol = `${c.symbol}USDT`;
-            await cancelAllOrders(venue, spotSymbol, 'spot').catch(() => {});
-            await executeOrder(venue, {
-              symbol: spotSymbol,
-              side: 'sell',
-              qty: c.balance,
-              type: 'market',
-              category: 'spot'
-            }).catch(() => {});
-          }
-        }
-      }
-
-      console.log(`${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨 LIQUIDACIÓN COMPLETADA. EL SISTEMA SE CONGELARÁ (FROZEN) POR SEGURIDAD. 🚨${ANSI_COLORS.RESET}`);
-      while (true) {
-        await new Promise(r => setTimeout(r, 60000));
-      }
-    }
-
-    // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
-    if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {
-      isDamageControl = true;
-      console.log(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
-    }
-
-    // Registrar Snapshot en BD
-    await prisma.performanceSnapshot.create({
-      data: {
-        totalEquity: balance.cash,
-        unrealizedPnL: totalUnrealizedPnL,
-        notes: `Iteración #${iterationCount} - Estado: ${isDamageControl ? 'DAMAGE_CONTROL' : (iterationCount % 5 === 0 ? 'AUDIT' : 'NORMAL')}`
-      }
-    });
-
-    if (isDamageControl) {
-      currentState = 'DAMAGE_CONTROL';
-      marketContext = DAMAGE_CONTROL_MANDATE;
-    } else if (iterationCount % 5 === 0) {
-      currentState = 'PORTFOLIO_AUDIT';
-      marketContext = MARKET_STATES.PORTFOLIO_AUDIT;
-      console.log(`${LOG_PREFIX.SISTEMA} 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})${ANSI_COLORS.RESET}`);
-    } else if (mode === TRADING_MODES.CRYPTO) {
-      currentState = 'CRYPTO_ALWAYS_OPEN';
-      marketContext = MARKET_STATES.CRYPTO_ALWAYS_OPEN;
-    } else {
-      const { bymaOpen, wsPreMarket, wsOpen, wsAfterHours } = getMarketStatus();
-
-      currentState = 'RESEARCH_MODE';
-      marketContext = MARKET_STATES.RESEARCH_MODE;
-
-      if (wsOpen || bymaOpen) {
-        currentState = 'MARKET_OPEN';
-        marketContext = MARKET_STATES.MARKET_OPEN;
-      } else if (wsPreMarket) {
-        currentState = 'PRE_MARKET_SYNC';
-        marketContext = MARKET_STATES.PRE_MARKET_SYNC;
-      } else if (wsAfterHours) {
-        currentState = 'AFTER_HOURS_REVIEW';
-        marketContext = MARKET_STATES.AFTER_HOURS_REVIEW;
-      }
-    }
-
-    console.log(`${LOG_PREFIX.SISTEMA} Estado actual de mercados detectado: ${currentState}`);
-
-    marketContext += `\n\n**ESTADO DE TU BILLETERA REAL EN ${venue.toUpperCase()}:**\n`;
-    marketContext += `- Poder Spot (Liquidez): $${spot.toFixed(2)}\n`;
-    marketContext += `- Poder Futuros (Garantía): $${futures.toFixed(2)}\n`;
-    if (!hasCapital) {
-      marketContext += `\n⚠️ **ATENCIÓN: CAPITAL INSUFICIENTE.** No tienes saldo disponible para abrir nuevas posiciones. Tu prioridad absoluta debe ser decidir si esperas o si cierras posiciones activas para liberar capital. No intentes analizar nuevas compras.\n`;
-    }
-
-    if (currentState !== 'RESEARCH_MODE') {
-      const latestInsight = await prisma.marketInsight.findFirst({
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (latestInsight) {
-        marketContext += `\n\n**Último Análisis de Fin de Semana (Market Insight BD):**\nContexto: ${latestInsight.context}\nSeveridad: ${latestInsight.severity}\nAcción Deducida: ${latestInsight.deducedAction}`;
-      }
-    }
-
-    console.log(`${LOG_PREFIX.SISTEMA} Evaluando ejecución de Sub-Agentes...`);
+    const activeVenues: VenueName[] = mode === TRADING_MODES.CRYPTO ? [VENUES.BYBIT] : [VENUES.ALPACA, VENUES.BYBIT];
 
     // Ejecutar Research Agent cada 1 hora (SYSTEM_INTERVALS.RESEARCH_MS ms)
     const now = Date.now();
@@ -233,8 +71,6 @@ async function runDaemonIteration(mode?: string) {
       console.log(`${LOG_PREFIX.SISTEMA} Ejecutando a Richard Newman (Analista Macro/Noticias)...`);
       cachedResearchReport = await runResearchAgent('Resumen macroeconómico, eventos clave del día y estado general del mercado de criptomonedas.');
       lastResearchTime = now;
-
-      // Podríamos guardar el insight en base de datos aquí si lo necesitamos persistente
     } else {
       console.log(`${LOG_PREFIX.SISTEMA} Usando caché de Richard Newman (Menos de 1h desde la última ejecución).`);
     }
@@ -250,65 +86,239 @@ async function runDaemonIteration(mode?: string) {
       }
     }
 
-    // El quant agent analiza SPY por defecto en modo normal, o los activos actuales en modo crypto
-    const targetAsset = mode === TRADING_MODES.CRYPTO ? StateService.getCurrentCryptoAsset() : 'SPY';
-    const assetsToAnalyze = new Set<string>();
-    assetsToAnalyze.add(targetAsset);
+    for (const venue of activeVenues) {
+      if (frozenVenues.has(venue)) {
+        console.log(`\n${LOG_PREFIX.SISTEMA} 🧊 OMITIENDO ${venue.toUpperCase()}: El broker se encuentra CONGELADO por Circuit Breaker.`);
+        continue;
+      }
+      console.log(`\n${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}========== [ EVALUANDO CARTERA: ${venue.toUpperCase()} ] ==========${ANSI_COLORS.RESET}`);
+      console.log(`${LOG_PREFIX.SISTEMA} Consultando estado de billetera real en ${venue}...`);
+      const balance = await getUnifiedBalance(venue);
+      const spot = balance.spotPower || 0;
+      const futures = balance.dayTradingPower || 0;
+      const hasCapital = spot >= 10 || futures >= 10;
 
-    if (mode === TRADING_MODES.CRYPTO && balance.coins) {
-      balance.coins.forEach(c => {
-        if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
-          assetsToAnalyze.add(`${c.symbol}USDT`);
+      let currentState: string;
+      let marketContext: string;
+      let isDamageControl = false;
+
+      // Calcular Unrealized PnL
+      const positions = await getUnifiedPositions(venue).catch(() => []);
+      
+      // Rastrear posiciones cerradas
+      if (iterationCount > 1) {
+        const currentSymbols = new Set(positions.map(p => p.symbol));
+        for (const [symbol, pos] of Object.entries(lastPositionsMap[venue] || {})) {
+          if (!currentSymbols.has(symbol)) {
+            const closedInfo = await getClosedPositionInfo(venue, symbol).catch(() => null);
+            const reason = closedInfo ? closedInfo.reason : 'Broker (Automático)';
+            const pnl = closedInfo ? closedInfo.closedPnl : 0;
+            const msgColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+            const sign = pnl >= 0 ? '+' : '';
+            console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}🛎️ Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
+          }
+        }
+      }
+      
+      lastPositionsMap[venue] = {};
+      positions.forEach(p => lastPositionsMap[venue][p.symbol] = p);
+
+      const totalUnrealizedPnL = positions.reduce((sum, p) => sum + (p.unrealizedPl || 0), 0);
+      const pnlPercentage = balance.cash > 0 ? totalUnrealizedPnL / balance.cash : 0;
+
+      const pnlColor = totalUnrealizedPnL >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+      console.log(`${ANSI_COLORS.CYAN}  💰 ESTADO DE BILLETERA (${venue.toUpperCase()})${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.GRAY}  ├─ Total Equity    : ${ANSI_COLORS.GREEN}$${balance.cash.toFixed(2)}${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.GRAY}  ├─ Margin Balance  : ${ANSI_COLORS.GREEN}$${futures.toFixed(2)}${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.GRAY}  ├─ Spot (Liquidez) : ${ANSI_COLORS.GREEN}$${spot.toFixed(2)}${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.GRAY}  └─ Unrealized PnL  : ${pnlColor}$${totalUnrealizedPnL.toFixed(2)} (${(pnlPercentage * 100).toFixed(2)}%)${ANSI_COLORS.RESET}`);
+
+      // Dynamic logging of spot coins
+      if (balance.coins && balance.coins.length > 0) {
+        const currentCoinsHash = JSON.stringify(balance.coins);
+        if (currentCoinsHash !== lastLoggedCoinsHash) {
+          lastLoggedCoinsHash = currentCoinsHash;
+          console.log(`${ANSI_COLORS.CYAN}  🪙 PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
+          balance.coins.forEach((c, index) => {
+            const isLast = index === balance.coins!.length - 1;
+            const prefix = isLast ? '└─' : '├─';
+            const usdVal = c.usdValue !== undefined ? ` (~$${c.usdValue.toFixed(2)})` : '';
+            console.log(`${ANSI_COLORS.GRAY}  ${prefix} ${c.symbol.padEnd(6)}: ${ANSI_COLORS.GREEN}${c.balance}${ANSI_COLORS.GRAY}${usdVal}${ANSI_COLORS.RESET}`);
+          });
+        }
+      }
+      console.log('');
+
+      // EMERGENCY CIRCUIT BREAKER (-25%)
+      if (pnlPercentage <= -0.25) {
+        console.log(`\n${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨🚨 ALERTA ROJA NUCLEAR: EMERGENCY LIQUIDATION (-25% PATRIMONIO) 🚨🚨${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.RED}Ejecutando Botón de Pánico: Apagando agentes y liquidando todo a Market.${ANSI_COLORS.RESET}`);
+        
+        StateService.setScrappyConfig(false);
+
+        for (const p of positions) {
+          if (p.qty > 0) {
+            console.log(`[Circuit Breaker] Cancelando órdenes y cerrando ${p.symbol}...`);
+            await cancelAllOrders(venue, p.symbol, 'linear').catch(() => {});
+            await executeOrder(venue, {
+              symbol: p.symbol,
+              side: p.side === 'buy' ? 'sell' : 'buy',
+              qty: p.qty,
+              type: 'market',
+              category: 'linear',
+              reduceOnly: true
+            }).catch(() => {});
+          }
+        }
+
+        if (balance.coins) {
+          for (const c of balance.coins) {
+            if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
+              const spotSymbol = `${c.symbol}USDT`;
+              await cancelAllOrders(venue, spotSymbol, 'spot').catch(() => {});
+              await executeOrder(venue, {
+                symbol: spotSymbol,
+                side: 'sell',
+                qty: c.balance,
+                type: 'market',
+                category: 'spot'
+              }).catch(() => {});
+            }
+          }
+        }
+
+        console.log(`${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨 LIQUIDACIÓN COMPLETADA EN ${venue.toUpperCase()}. EL BROKER SE CONGELARÁ (FROZEN) POR SEGURIDAD. 🚨${ANSI_COLORS.RESET}`);
+        frozenVenues.add(venue);
+        continue;
+      }
+
+      // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
+      if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {
+        isDamageControl = true;
+        console.log(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
+      }
+
+      // Registrar Snapshot en BD
+      await prisma.performanceSnapshot.create({
+        data: {
+          totalEquity: balance.cash,
+          unrealizedPnL: totalUnrealizedPnL,
+          notes: `Iteración #${iterationCount} (${venue}) - Estado: ${isDamageControl ? 'DAMAGE_CONTROL' : (iterationCount % 5 === 0 ? 'AUDIT' : 'NORMAL')}`
         }
       });
-    }
 
-    const assetsArray = Array.from(assetsToAnalyze);
-    let quantReport = "No se ejecutó Quant Agent por falta de liquidez (Ahorro de recursos).";
+      if (isDamageControl) {
+        currentState = 'DAMAGE_CONTROL';
+        marketContext = DAMAGE_CONTROL_MANDATE;
+      } else if (iterationCount % 5 === 0) {
+        currentState = 'PORTFOLIO_AUDIT';
+        marketContext = MARKET_STATES.PORTFOLIO_AUDIT;
+        console.log(`${LOG_PREFIX.SISTEMA} 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})${ANSI_COLORS.RESET}`);
+      } else if (mode === TRADING_MODES.CRYPTO) {
+        currentState = 'CRYPTO_ALWAYS_OPEN';
+        marketContext = MARKET_STATES.CRYPTO_ALWAYS_OPEN;
+      } else {
+        const { bymaOpen, wsPreMarket, wsOpen, wsAfterHours } = getMarketStatus();
 
-    if (hasCapital) {
-      console.log(`${LOG_PREFIX.SISTEMA} Despertando a Rick Queen (Quant Agent) para analizar ${assetsArray.join(', ')}...`);
-      quantReport = await runQuantAgent(assetsArray, venue);
-    } else {
-      console.log(`${LOG_PREFIX.SISTEMA} Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
-    }
+        currentState = 'RESEARCH_MODE';
+        marketContext = MARKET_STATES.RESEARCH_MODE;
 
-    console.log(`${LOG_PREFIX.SISTEMA} Reportes listos. Entregando al CEO Trader para toma de decisiones...`);
+        if (wsOpen || bymaOpen) {
+          currentState = 'MARKET_OPEN';
+          marketContext = MARKET_STATES.MARKET_OPEN;
+        } else if (wsPreMarket) {
+          currentState = 'PRE_MARKET_SYNC';
+          marketContext = MARKET_STATES.PRE_MARKET_SYNC;
+        } else if (wsAfterHours) {
+          currentState = 'AFTER_HOURS_REVIEW';
+          marketContext = MARKET_STATES.AFTER_HOURS_REVIEW;
+        }
+      }
 
-    // Inyectar reportes al contexto del CEO
-    marketContext += `\n\n**Reporte de Richard Newman (Macro/Noticias):**\n${cachedResearchReport}`;
-    marketContext += `\n\n**Reporte de Rick Queen (Precios y Riesgo en Vivo):**\n${quantReport}`;
-    if (mode === TRADING_MODES.CRYPTO) {
-      marketContext += `\n\n**Reporte de Markus Skinner (Oportunidades):**\n${cachedScannerReport}`;
-    }
+      console.log(`${LOG_PREFIX.SISTEMA} Estado actual de mercados detectado: ${currentState}`);
 
-    const agentPrompt = isDamageControl 
-      ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.`
-      : (currentState === 'PORTFOLIO_AUDIT' 
-        ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.`
-        : `Analiza los reportes de tus sub-agentes, el estado del mercado actual y ejecuta operaciones segundo a segundo si encuentras una oportunidad clara según tu Risk Engine. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio. En modo crypto, operas 24/7 sin descanso. REGLA ESTRICTA: SOLO estás autorizado a operar en el broker activo: ${venue.toUpperCase()}. Ignora tu balance en otros brokers.`);
+      marketContext += `\n\n**ESTADO DE TU BILLETERA REAL EN ${venue.toUpperCase()}:**\n`;
+      marketContext += `- Poder Spot (Liquidez): $${spot.toFixed(2)}\n`;
+      marketContext += `- Poder Futuros (Garantía): $${futures.toFixed(2)}\n`;
+      if (!hasCapital) {
+        marketContext += `\n⚠️ **ATENCIÓN: CAPITAL INSUFICIENTE.** No tienes saldo disponible para abrir nuevas posiciones. Tu prioridad absoluta debe ser decidir si esperas o si cierras posiciones activas para liberar capital. No intentes analizar nuevas compras.\n`;
+      }
 
-    const agentResponse = await runAgentCycle(
-      agentPrompt,
-      marketContext
-    );
+      if (currentState !== 'RESEARCH_MODE') {
+        const latestInsight = await prisma.marketInsight.findFirst({
+          orderBy: { createdAt: 'desc' },
+        });
 
-    console.log(`${LOG_PREFIX.CEO_TRADER} Respuesta obtenida y ciclo cerrado.\x1b[0m`);
-    
-    let finalContent = typeof agentResponse === 'string' ? agentResponse : (agentResponse?.content || '');
-    
-    const titleMatch = finalContent.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
-    if (titleMatch) {
-      console.log(`${LOG_PREFIX.AUDITORIA} ${titleMatch[1].trim()}${ANSI_COLORS.RESET}`);
-    } else {
-      console.log(`${LOG_PREFIX.AUDITORIA} Ciclo completado sin acciones.${ANSI_COLORS.RESET}`);
-    }
+        if (latestInsight) {
+          marketContext += `\n\n**Último Análisis de Fin de Semana (Market Insight BD):**\nContexto: ${latestInsight.context}\nSeveridad: ${latestInsight.severity}\nAcción Deducida: ${latestInsight.deducedAction}`;
+        }
+      }
+
+      console.log(`${LOG_PREFIX.SISTEMA} Evaluando ejecución de Sub-Agentes...`);
+
+      // El quant agent analiza SPY por defecto en modo normal, o los activos actuales en modo crypto
+      const targetAsset = mode === TRADING_MODES.CRYPTO ? StateService.getCurrentCryptoAsset() : 'SPY';
+      const assetsToAnalyze = new Set<string>();
+      assetsToAnalyze.add(targetAsset);
+
+      if (mode === TRADING_MODES.CRYPTO && balance.coins) {
+        balance.coins.forEach(c => {
+          if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
+            assetsToAnalyze.add(`${c.symbol}USDT`);
+          }
+        });
+      }
+
+      const assetsArray = Array.from(assetsToAnalyze);
+      let quantReport = "No se ejecutó Quant Agent por falta de liquidez (Ahorro de recursos).";
+
+      if (hasCapital) {
+        console.log(`${LOG_PREFIX.SISTEMA} Despertando a Rick Queen (Quant Agent) para analizar ${assetsArray.join(', ')}...`);
+        quantReport = await runQuantAgent(assetsArray, venue);
+      } else {
+        console.log(`${LOG_PREFIX.SISTEMA} Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
+      }
+
+      console.log(`${LOG_PREFIX.SISTEMA} Reportes listos. Entregando al CEO Trader para toma de decisiones...`);
+
+      // Inyectar reportes al contexto del CEO
+      marketContext += `\n\n**Reporte de Richard Newman (Macro/Noticias):**\n${cachedResearchReport}`;
+      marketContext += `\n\n**Reporte de Rick Queen (Precios y Riesgo en Vivo):**\n${quantReport}`;
+      if (mode === TRADING_MODES.CRYPTO) {
+        marketContext += `\n\n**Reporte de Markus Skinner (Oportunidades):**\n${cachedScannerReport}`;
+      }
+
+      const agentPrompt = isDamageControl 
+        ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.`
+        : (currentState === 'PORTFOLIO_AUDIT' 
+          ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.`
+          : `Analiza los reportes de tus sub-agentes y el estado del mercado. Tómate el tiempo necesario para pensar. Quiero decisiones QUIRÚRGICAS, basadas en fundamentos técnicos y lógicos, respaldadas por información verificable. Tu análisis debe ser exhaustivo, claro, metodológico, experto y profesional. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio de forma inteligente. En modo crypto, operas 24/7 sin descanso. REGLA ESTRICTA: SOLO estás autorizado a operar en el broker activo: ${venue.toUpperCase()}. Ignora tu balance en otros brokers.`);
+
+      const agentResponse = await runAgentCycle(
+        agentPrompt,
+        marketContext
+      );
+
+      console.log(`${LOG_PREFIX.CEO_TRADER} Respuesta obtenida y ciclo cerrado.\x1b[0m`);
+      
+      let finalContent = typeof agentResponse === 'string' ? agentResponse : (agentResponse?.content || '');
+      
+      const titleMatch = finalContent.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
+      if (titleMatch) {
+        console.log(`${LOG_PREFIX.AUDITORIA} ${titleMatch[1].trim()}${ANSI_COLORS.RESET}`);
+      } else {
+        console.log(`${LOG_PREFIX.AUDITORIA} Ciclo completado sin acciones.${ANSI_COLORS.RESET}`);
+      }
+
+    } // Fin bucle venues
 
   } catch (error: any) {
     if (error.message?.includes('tool_use_failed') || error.message?.includes('tool call validation failed')) {
-      console.warn(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}[Aviso] Un sub-agente falló al generar JSON válido (tool_use_failed). Ignorando ciclo...${ANSI_COLORS.RESET}`);
+      const errWarnTimestamp = DateTime.now().setZone('America/Argentina/Buenos_Aires').toFormat('dd/MM/yyyy HH:mm:ss');
+      console.warn(`${LOG_PREFIX.SISTEMA} [${errWarnTimestamp}] ${ANSI_COLORS.RED}[Aviso] Un sub-agente falló al generar JSON válido (tool_use_failed). Ignorando ciclo...${ANSI_COLORS.RESET}`);
     } else {
-      console.error(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}[Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}${ANSI_COLORS.RESET}`);
+      const errTimestamp = DateTime.now().setZone('America/Argentina/Buenos_Aires').toFormat('dd/MM/yyyy HH:mm:ss');
+      console.error(`${LOG_PREFIX.SISTEMA} [${errTimestamp}] ${ANSI_COLORS.RED}[Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}${ANSI_COLORS.RESET}`);
       console.error(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}Deteniendo el daemon por completo para revisión manual.${ANSI_COLORS.RESET}`);
       process.exit(1);
     }

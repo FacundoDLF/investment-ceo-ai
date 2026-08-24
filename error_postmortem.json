@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-24T00:43:37.195Z",
+  "timestamp": "2026-08-24T18:56:09.377Z",
   "uid": "groq::openai/gpt-oss-20b",
   "model": "openai/gpt-oss-20b",
   "provider": "groq",
   "status": 400,
-  "error": "400 {\"error\":{\"message\":\"Parsing failed. The model generated output that could not be parsed. Please adjust your prompt. See 'failed_generation' for more details.\",\"type\":\"invalid_request_error\",\"code\":\"output_parse_failed\",\"failed_generation\":\"We need to decide action. Currently position open: BUY. PnL Flotante: -0.501%. This is loss > -0.30%? Actually -0.501% <= -0.30% so rule 3: add to position. Since we are long, we open another long (OPEN_LONG). Also maybe we should close? No, rule 3 says if loss <= -0.30% add to position, no closing. So action: OPEN_LONG.\"}}"
+  "error": "400 {\"error\":{\"message\":\"Parsing failed. The model generated output that could not be parsed. Please adjust your prompt. See 'failed_generation' for more details.\",\"type\":\"invalid_request_error\",\"code\":\"output_parse_failed\",\"failed_generation\":\"We need to output a function call to scalp_action. Current state: open BUY at 78981.8, PnL -0.094% (< -0.50%? No, -0.094% > -0.5). So no DCA. PnL not >= +0.15%. So we hold. Since open position, we hold. So action: \\\"HOLD\\\".\"}}"
 }

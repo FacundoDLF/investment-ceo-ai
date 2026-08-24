@@ -59,7 +59,8 @@ Reglas Críticas:
 1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad.
 2. Si tienes posición y el PnL Flotante Bruto es >= +0.15% (profit), CIERRA inmediatamente. Esto asegura cubrir el ~0.10% de comisiones del exchange y dejar un neto positivo.
 3. Si el PnL Flotante Bruto es <= -0.50% (loss), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. No cierres en pérdida, ¡promedia!
-4. No envíes explicaciones. Responde SÓLO ejecutando 'scalp_action'.`;
+4. NO PIENSES. NO RAZONES. NO EXPLIQUES NADA.
+5. Tu ÚNICA salida permitida es invocar la herramienta 'scalp_action' INMEDIATAMENTE. No escribas texto antes ni después.`;
 
     const scalpTool: ChatCompletionTool = {
       type: 'function',
@@ -80,7 +81,7 @@ Reglas Críticas:
       role: 'EXECUTOR',
       messages: [{ role: 'system', content: systemPrompt }],
       tools: [scalpTool],
-      tool_choice: 'auto'
+      tool_choice: { type: 'function', function: { name: 'scalp_action' } }
     });
 
     const msg = response.choices[0]?.message;
@@ -160,11 +161,15 @@ async function executeScalpAction(
         }).catch(() => { });
       }
 
+      const realizedPnl = myPosition.unrealizedPl || 0;
+      await MissionService.addScrappyPnL(realizedPnl);
+      await MissionService.addLifetimeScrappyPnL(realizedPnl);
+
       if (Math.abs(pnlPct) >= 0.5) {
         const msgColor = pnlPct > 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.WHITE;
-        console.log(`${LOG_PREFIX.SCRAPPY} ${msgColor}💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.SCRAPPY} ${msgColor}💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% ($${realizedPnl.toFixed(2)})${ANSI_COLORS.RESET}`);
         await prisma.executionLog.create({
-          data: { eventType: 'SCALP_TRADE_CLOSED', venue: 'bybit', symbol, success: true, details: JSON.stringify({ pnlPct }) }
+          data: { eventType: 'SCALP_TRADE_CLOSED', venue: 'bybit', symbol, success: true, details: JSON.stringify({ pnlPct, realizedPnl }) }
         });
       }
       return;

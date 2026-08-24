@@ -244,12 +244,18 @@ async function executeScalpAction(
         console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} ⚡ ¡Grrr! Atacó con un ${sideStr} en ${symbol} a $${currentPrice.toFixed(2)} (Entrada Inicial)`);
       }
 
+      // 🛡️ HFT: Zero Slippage & Maker Fees. Entramos con Limit Post-Only.
+      // Si compramos (LONG), nos ponemos en el BID. Si vendemos (SHORT), nos ponemos en el ASK.
+      const limitPrice = action === 'OPEN_LONG' ? priceData.bid : priceData.ask;
+
       await executeOrder('bybit', {
         symbol: symbol,
         side: side,
         qty: qty,
-        type: 'market',
-        category: 'linear'
+        type: 'limit',
+        limitPrice: limitPrice,
+        category: 'linear',
+        postOnly: true
       }).catch((e) => { 
         console.log(`${LOG_PREFIX.SCRAPPY} ${ANSI_COLORS.RED}Error abriendo posición: ${e.message}${ANSI_COLORS.RESET}`);
       });

@@ -348,11 +348,13 @@ async function runDaemonIteration(mode?: string) {
 
       const scrappyExclusion = scrappyConf.active && venue === 'bybit' ? ` IGNORA y NO CIERRES la posición en ${scrappyConf.targetAsset} porque es gestionada independientemente por el bot HFT Scrappy (no requiere thesis).` : '';
 
-      const agentPrompt = isDamageControl
+      let agentPrompt = isDamageControl
         ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.${scrappyExclusion}`
         : (currentState === 'PORTFOLIO_AUDIT'
           ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.${scrappyExclusion}`
           : `Analiza los reportes de tus sub-agentes y el estado del mercado. Tómate el tiempo necesario para pensar. Quiero decisiones QUIRÚRGICAS, basadas en fundamentos técnicos y lógicos, respaldadas por información verificable. Tu análisis debe ser exhaustivo, claro, metodológico, experto y profesional. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio de forma inteligente. En modo crypto, operas 24/7 sin descanso. REGLA ESTRICTA: SOLO estás autorizado a operar en el broker activo: ${venue.toUpperCase()}. Ignora tu balance en otros brokers.${scrappyExclusion}`);
+
+      agentPrompt += `\n\nREGLA CRÍTICA PARA HERRAMIENTAS: Si decides invocar una herramienta, TIENES PROHIBIDO escribir cualquier texto, razonamiento o explicación. Debes emitir ÚNICAMENTE el bloque JSON de la herramienta en silencio absoluto.\nSi decides NO usar herramientas y terminar tu turno sin acciones, genera tu razonamiento interno (breve) y utiliza obligatoriamente [TÍTULO: Resumen de tu decisión] al final del texto para resumir.`;
 
       const agentResponse = await runAgentCycle(
         agentPrompt,

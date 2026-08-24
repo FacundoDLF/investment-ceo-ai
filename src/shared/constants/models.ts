@@ -41,8 +41,8 @@ function makeModel(
 }
 
 export const MODEL_REGISTRY: AIModel[] = [
-  // CEO / Strategist — gpt-oss-120b (groq, free), qwen 2.5 72b (openrouter, paid)
-  makeModel('groq', 'openai/gpt-oss-120b', 'free', ['CEO', 'STRATEGIST'], { reasoning: true, toolCalling: true }),
+  // CEO / Strategist — Llama 3 70B especializado en Tool Use (groq, free)
+  makeModel('groq', 'llama3-groq-70b-8192-tool-use-preview', 'free', ['CEO', 'STRATEGIST'], { reasoning: true, toolCalling: true }),
   makeModel('openrouter', 'qwen/qwen-2.5-72b-instruct', 'paid', ['CEO', 'STRATEGIST'], { reasoning: true, toolCalling: true }),
 
   // Analyst — qwen3.6-27b (groq, free), deepseek v4 (openrouter, paid)

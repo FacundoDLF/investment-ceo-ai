@@ -35,15 +35,21 @@
 * **Contexto:** Llama 70B en Groq es ultra rápido (ideal para High Frequency Trading), pero a veces carece del razonamiento profundo.
 * **Solución:** Se creó la herramienta `consult_smart_analyst`. Llama 70B tiene permiso para invocarla si el mercado es ambiguo. Esto envía el contexto por debajo a OpenRouter y le devuelve el consejo estratégico a Llama.
 
+### [ISSUE] Error 400 (spend_limit_reached) en Groq y 402 en OpenRouter (Blackout Total)
+* **Contexto:** Durante la ejecución, Groq puede bloquear la API si se alcanza el umbral de alerta de gasto (`spend_limit_reached`), devolviendo un HTTP 400.
+* **Problema:** El sistema realiza correctamente el fallback a OpenRouter, pero si la cuenta de OpenRouter también está sin fondos (402), el sistema se queda sin ningún modelo disponible, provocando un "Blackout total" y pausando la ejecución por 120s (o abortando, dependiendo de la capa que capture el 402).
+* **Solución (Operativa):** Esto no es un bug del código. Requiere que el administrador intervenga recargando saldo o ajustando el límite de gasto en la consola de Groq (https://console.groq.com/settings/billing) y OpenRouter.
+* **REGLA:** Ante un "Blackout total" por falta de fondos combinada, notifica al usuario que ambas fuentes (nativa y fallback) se han quedado sin saldo/límite.
+
 ---
 
 ## 2. Ejecución de Órdenes y Brokers
 
 ### [ISSUE] Bybit API Error: Qty invalid o "Data sent for paramter '' is not valid"
-* **Contexto:** Al operar en Bybit (ej. `BTCUSDT`), el Quant Agent calculaba cantidades matemáticas precisas pero muy pequeñas (ej. `0.00054`).
-* **Problema:** Bybit rechaza cantidades con excesivos decimales, pero el truncado original agresivo (`Math.floor(qty * 1000) / 1000`) provocaba que compras pequeñas de BTC terminaran siendo `0`. La API de Bybit rechaza cantidades `0` con el críptico error: `Data sent for paramter '' is not valid`.
-* **Solución:** En `src/features/agent/tools/execute-trade.tool.ts` y `scrappy.agent.ts`, se refinó la normalización. Ahora BTC preserva hasta 5 decimales (`Math.floor(qty * 100000) / 100000`), ETH hasta 4, y el resto hasta 2. Si el truncado final arroja `<= 0`, se detiene la orden localmente lanzando un error claro al LLM ("cantidad inválida o redondeada a cero") en lugar de chocar contra el broker.
-* **REGLA:** NUNCA envíes un `qty` igual a 0 al broker ni uses un `Math.floor` entero para criptomonedas valiosas.
+* **Contexto:** Al operar en Bybit (ej. `BTCUSDT`), el Quant Agent o el bot HFT Scrappy calculaban cantidades matemáticas precisas pero muy pequeñas (ej. `0.00054` o con excesivos decimales `0.12985`).
+* **Problema:** Bybit rechaza cantidades con excesivos decimales si superan la regla del contrato Linear (`qtyStep`). El truncado original agresivo (`Math.floor(qty * 1000) / 1000`) provocaba que compras pequeñas de BTC terminaran siendo `0` en Spot, y hardcodear decimales causaba errores `Qty invalid` en monedas exóticas o muy baratas.
+* **Solución:** En `bybit.adapter.ts` se implementó `getInstrumentInfo` que consulta el endpoint `/v5/market/instruments-info` y cachea la respuesta. En `scrappy.agent.ts`, se hace `Number((Math.floor(qty / info.qtyStep) * info.qtyStep).toFixed(precision))` para respetar milimétricamente el `qtyStep` dinámico del broker antes de enviar la orden.
+* **REGLA:** NUNCA hardcodees la cantidad de decimales permitida para una orden. Siempre utiliza la API del broker para obtener el `qtyStep` dinámico del instrumento y formatea la cantidad usándolo como divisor/multiplicador.
 
 ### [ISSUE] Bybit API Error: ab not enough for new order (Hedge Mode Close)
 * **Contexto:** El CEO intentaba cerrar una posición Long perdedora durante el MODO DAMAGE CONTROL.

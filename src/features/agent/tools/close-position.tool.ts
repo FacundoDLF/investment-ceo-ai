@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { getUnifiedPositions, executeOrder, VenueName } from '@/features/venues/venue.service';
 import { prisma } from '@/shared/lib/prisma';
+import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 
 export const closePositionSchema = z.object({
   venue: z.enum(['alpaca', 'bybit']).describe('Venue donde se encuentra la posición'),
@@ -108,7 +109,7 @@ export async function executeClosePosition(args: string): Promise<any> {
     });
 
   } catch (error: any) {
-    console.error(`❌ Error en close_position: ${error.message}`);
+    console.error(`${LOG_PREFIX.BROKER_ERROR} ${ANSI_COLORS.RED}❌ Error en close_position: ${error.message}${ANSI_COLORS.RESET}`);
     return JSON.stringify({ error: error.message });
   }
 }

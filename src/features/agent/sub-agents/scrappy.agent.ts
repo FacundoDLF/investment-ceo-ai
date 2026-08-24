@@ -56,8 +56,8 @@ Tu estado actual:
 
 Reglas Críticas:
 1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad.
-2. Si tienes posición y el PnL es >= +0.03% (profit), CIERRA inmediatamente para asegurar ganancia.
-3. Si el PnL es <= -0.30% (loss), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. No cierres en pérdida, ¡promedia!
+2. Si tienes posición y el PnL Flotante Bruto es >= +0.15% (profit), CIERRA inmediatamente. Esto asegura cubrir el ~0.10% de comisiones del exchange y dejar un neto positivo.
+3. Si el PnL Flotante Bruto es <= -0.50% (loss), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. No cierres en pérdida, ¡promedia!
 4. No envíes explicaciones. Responde SÓLO ejecutando 'scalp_action'.`;
 
     const scalpTool: ChatCompletionTool = {
@@ -141,7 +141,7 @@ async function executeScalpAction(
           postOnly: true,
           reduceOnly: true
         }).catch((e) => {
-          console.log(`${ANSI_COLORS.RED}[Scrappy] Error Take Profit: ${e.message}${ANSI_COLORS.RESET}`);
+          console.log(`${LOG_PREFIX.SCRAPPY} ${ANSI_COLORS.RED}Error Take Profit: ${e.message}${ANSI_COLORS.RESET}`);
         });
 
       } else {
@@ -160,7 +160,8 @@ async function executeScalpAction(
       }
 
       if (Math.abs(pnlPct) >= 0.5) {
-        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%`);
+        const msgColor = pnlPct > 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.WHITE;
+        console.log(`${LOG_PREFIX.SCRAPPY} ${msgColor}💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%${ANSI_COLORS.RESET}`);
         await prisma.executionLog.create({
           data: { eventType: 'SCALP_TRADE_CLOSED', venue: 'bybit', symbol, success: true, details: JSON.stringify({ pnlPct }) }
         });
@@ -183,7 +184,7 @@ async function executeScalpAction(
         const precision = info.qtyStep.toString().split('.')[1]?.length || 0;
         qty = Number((Math.floor(qty / info.qtyStep) * info.qtyStep).toFixed(precision));
       } catch (e: any) {
-        console.log(`${ANSI_COLORS.RED}[Scrappy] Error obteniendo info del instrumento: ${e.message}${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.SCRAPPY} ${ANSI_COLORS.RED}Error obteniendo info del instrumento: ${e.message}${ANSI_COLORS.RESET}`);
         // Fallback genérico por si falla la API
         if (symbol === 'BTCUSDT') {
           qty = Math.floor(qty * 1000) / 1000;
@@ -216,7 +217,7 @@ async function executeScalpAction(
         type: 'market',
         category: 'linear'
       }).catch((e) => { 
-        console.log(`${ANSI_COLORS.RED}[Scrappy] Error abriendo posición: ${e.message}${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.SCRAPPY} ${ANSI_COLORS.RED}Error abriendo posición: ${e.message}${ANSI_COLORS.RESET}`);
       });
 
       lastActionTime = now;

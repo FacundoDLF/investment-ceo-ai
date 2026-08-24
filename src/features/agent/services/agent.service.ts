@@ -43,7 +43,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       if ((error.status === 400 && error.message?.includes('tool call validation failed')) || 
           error.message?.includes('tool_use_failed') ||
           error.message?.includes('tool call')) {
-        console.warn(`${LOG_PREFIX.SISTEMA_CRITICO} Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...${ANSI_COLORS.RESET}`);
+        console.warn(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}Advertencia: El LLM alucinó la herramienta o violó el formato JSON. Reintentando...${ANSI_COLORS.RESET}`);
         currentMessages.push({
           role: 'user',
           content: 'Tu última llamada a herramienta fue rechazada por el servidor porque usaste un nombre inválido (ej: agregaste <|channel|>) o violaste el esquema JSON. Responde con el nombre de herramienta y formato exacto requerido.'
@@ -173,6 +173,12 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
               const args = JSON.parse(toolCall.function.arguments);
               displayResult = `(Acción: ${args.action}, Motivo: ${args.reason})`;
             } catch (e) { }
+          } else if (toolCall.function.name === 'close_position') {
+            if (parsed?.error) {
+              displayResult = `❌ Error: ${parsed.error}`;
+            } else {
+              displayResult = `✅ ${parsed?.message || 'Posición cerrada'} (Motivo: ${parsed?.reason})`;
+            }
           } else if (typeof result === 'object') {
             displayResult = JSON.stringify(result);
           }
@@ -180,14 +186,23 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           if (typeof result === 'object') displayResult = JSON.stringify(result);
         }
 
+        let finalColor = ANSI_COLORS.WHITE;
+        if (typeof displayResult === 'string') {
+          if (displayResult.includes('❌') || displayResult.includes('Rechazado') || displayResult.includes('Error')) {
+            finalColor = ANSI_COLORS.RED;
+          } else if (displayResult.includes('✅') || displayResult.includes('Aprobado') || displayResult.includes('completado')) {
+            finalColor = ANSI_COLORS.GREEN;
+          }
+        }
+
         if (toolCall.function.name === 'consult_smart_analyst') {
-          console.log(`${ANSI_COLORS.GREEN}[Sistema]${ANSI_COLORS.RESET} ${displayResult}`);
+          console.log(`${LOG_PREFIX.SISTEMA} ${finalColor}${displayResult}${ANSI_COLORS.RESET}`);
         } else {
           let resultTitle = `Resultado de ${getFriendlyToolName(toolCall.function.name)}`;
           if (toolCall.function.name === 'validate_trade_intent') {
             resultTitle = `Resultados de Validación`;
           }
-          console.log(`${ANSI_COLORS.GREEN}[Sistema] ${resultTitle}:${ANSI_COLORS.RESET} ${displayResult}`);
+          console.log(`${LOG_PREFIX.SISTEMA} ${resultTitle}: ${finalColor}${displayResult}${ANSI_COLORS.RESET}`);
         }
 
         currentMessages.push({

@@ -14,7 +14,7 @@ export const executeTradeSchema = z.object({
   takeProfit: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio de Take Profit para orden OCO'),
   category: z.enum(['spot', 'linear']).optional().describe('Categoría de mercado (spot o linear/futuros). Por defecto linear.'),
   strategy: z.enum(['LONG_TERM', 'INTRADAY']).describe('Estrategia de la operación'),
-  thesis: z.string().max(300).describe('Breve tesis de inversión justificando este trade (Obligatorio para la auditoría de portafolio)'),
+  thesis: z.string().min(15, "La tesis es obligatoria y debe tener al menos 15 caracteres descriptivos").max(300).describe('Breve tesis de inversión justificando este trade (Obligatorio para la auditoría de portafolio)'),
 });
 
 export const executeTradeTool = {
@@ -35,7 +35,7 @@ export const executeTradeTool = {
         takeProfit: { type: ['number', 'null', 'string'] },
         category: { type: 'string', enum: ['spot', 'linear'] },
         strategy: { type: 'string', enum: ['LONG_TERM', 'INTRADAY'] },
-        thesis: { type: 'string', maxLength: 300 },
+        thesis: { type: 'string', minLength: 15, maxLength: 300, description: 'Debes proveer una tesis real descriptiva, no un texto vacío.' },
       },
       required: ['venue', 'symbol', 'side', 'qty', 'type', 'strategy', 'thesis'],
     },
@@ -146,7 +146,7 @@ export async function executeExecuteTrade(args: string) {
 
     return JSON.stringify(result);
   } catch (error: any) {
-    console.log(`${ANSI_COLORS.RED}[Broker Error]${ANSI_COLORS.RESET} ❌ ${error.message}`);
+    console.log(`${LOG_PREFIX.BROKER_ERROR} ${ANSI_COLORS.RED}❌ ${error.message}${ANSI_COLORS.RESET}`);
     return JSON.stringify({ error: error.message });
   }
 }

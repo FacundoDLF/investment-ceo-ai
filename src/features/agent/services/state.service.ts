@@ -2,7 +2,7 @@ export class StateService {
   private static currentCryptoAsset = 'BTCUSDT';
 
   // Scrappy State
-  private static scrappyActive = true; // Por defecto encendido en crypto
+  private static scrappyActive = false; // Por defecto apagado, CEO debe encenderlo
   private static scrappyTargetAsset = 'BTCUSDT';
   private static scrappyBudget = 10000; // Presupuesto de $10000 USD
 

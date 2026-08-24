@@ -83,9 +83,9 @@ async function runDaemonIteration(mode?: string) {
           const closedInfo = await getClosedPositionInfo(venue, symbol).catch(() => null);
           const reason = closedInfo ? closedInfo.reason : 'Broker (Automático)';
           const pnl = closedInfo ? closedInfo.closedPnl : 0;
-          const pnlColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+          const msgColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
           const sign = pnl >= 0 ? '+' : '';
-          console.log(`${ANSI_COLORS.CYAN}[CEO Trader]${ANSI_COLORS.RESET} 🛎️ ${ANSI_COLORS.YELLOW}Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${pnlColor}${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
+          console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}🛎️ Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
         }
       }
     }
@@ -166,7 +166,7 @@ async function runDaemonIteration(mode?: string) {
     // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
     if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {
       isDamageControl = true;
-      console.log(`${LOG_PREFIX.SISTEMA_CRITICO} ⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
+      console.log(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
     }
 
     // Registrar Snapshot en BD
@@ -306,12 +306,12 @@ async function runDaemonIteration(mode?: string) {
 
   } catch (error: any) {
     if (error.message?.includes('tool_use_failed') || error.message?.includes('tool call validation failed')) {
-      console.warn(`${LOG_PREFIX.SISTEMA_CRITICO} [Aviso] Un sub-agente falló al generar JSON válido (tool_use_failed). Ignorando ciclo...${ANSI_COLORS.RESET}`);
-      return;
+      console.warn(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}[Aviso] Un sub-agente falló al generar JSON válido (tool_use_failed). Ignorando ciclo...${ANSI_COLORS.RESET}`);
+    } else {
+      console.error(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}[Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}${ANSI_COLORS.RESET}`);
+      console.error(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}Deteniendo el daemon por completo para revisión manual.${ANSI_COLORS.RESET}`);
+      process.exit(1);
     }
-    console.error(`${LOG_PREFIX.SISTEMA_CRITICO} [Alarma Crítica] El ciclo falló o fue interrumpido. Motivo: ${error.message || 'Desconocido'}${ANSI_COLORS.RESET}`);
-    console.error(`${LOG_PREFIX.SISTEMA_CRITICO} Deteniendo el daemon por completo para revisión manual.${ANSI_COLORS.RESET}`);
-    process.exit(1);
   }
 }
 

@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-23T03:29:45.421Z",
+  "timestamp": "2026-08-24T00:43:37.195Z",
   "uid": "groq::openai/gpt-oss-20b",
   "model": "openai/gpt-oss-20b",
   "provider": "groq",
   "status": 400,
-  "error": "400 {\"error\":{\"message\":\"Tool call validation failed: tool call validation failed: attempted to call tool 'scarp_action' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"{\\\"name\\\": \\\"scarp_action\\\", \\\"arguments\\\": {\\\"action\\\":\\\"OPEN_SHORT\\\"}}\"}}"
+  "error": "400 {\"error\":{\"message\":\"Parsing failed. The model generated output that could not be parsed. Please adjust your prompt. See 'failed_generation' for more details.\",\"type\":\"invalid_request_error\",\"code\":\"output_parse_failed\",\"failed_generation\":\"We need to decide action. Currently position open: BUY. PnL Flotante: -0.501%. This is loss > -0.30%? Actually -0.501% <= -0.30% so rule 3: add to position. Since we are long, we open another long (OPEN_LONG). Also maybe we should close? No, rule 3 says if loss <= -0.30% add to position, no closing. So action: OPEN_LONG.\"}}"
 }

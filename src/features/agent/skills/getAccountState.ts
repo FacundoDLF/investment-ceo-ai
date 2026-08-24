@@ -1,6 +1,7 @@
 import { prisma } from '@/shared/lib/prisma';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { getUnifiedBalance, getUnifiedPositions } from '@/features/venues/venue.service';
+import { StateService } from '../services/state.service';
 
 export const getAccountStateTool: ChatCompletionTool = {
   type: 'function',
@@ -70,6 +71,7 @@ export async function executeGetAccountState() {
       bybit: enrichedBybit,
     },
     challenges,
+    scrappyState: StateService.getScrappyState(),
     scorecard: lastSnapshot
   };
 }

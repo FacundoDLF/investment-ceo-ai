@@ -110,7 +110,7 @@ async function runDaemonIteration(mode?: string) {
       const balance = await getUnifiedBalance(venue);
       const frozenReserve = await MissionService.getFrozenReserve(venue);
       const activeChallenge = await MissionService.getActiveChallenge(venue);
-      
+
       const spot = balance.spotPower || 0;
       let availableSpot = spot - frozenReserve;
       if (availableSpot < 0) availableSpot = 0;
@@ -124,7 +124,7 @@ async function runDaemonIteration(mode?: string) {
 
       // Calcular Unrealized PnL
       const positions = await getUnifiedPositions(venue).catch(() => []);
-      
+
       // Rastrear posiciones cerradas
       if (iterationCount > 1) {
         const currentSymbols = new Set(positions.map(p => p.symbol));
@@ -139,7 +139,7 @@ async function runDaemonIteration(mode?: string) {
           }
         }
       }
-      
+
       lastPositionsMap[venue] = {};
       positions.forEach(p => lastPositionsMap[venue][p.symbol] = p);
 
@@ -173,13 +173,13 @@ async function runDaemonIteration(mode?: string) {
       if (pnlPercentage <= -0.25) {
         console.log(`\n${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨🚨 ALERTA ROJA NUCLEAR: EMERGENCY LIQUIDATION (-25% PATRIMONIO) 🚨🚨${ANSI_COLORS.RESET}`);
         console.log(`${ANSI_COLORS.RED}Ejecutando Botón de Pánico: Apagando agentes y liquidando todo a Market.${ANSI_COLORS.RESET}`);
-        
+
         StateService.setScrappyConfig(false);
 
         for (const p of positions) {
           if (p.qty > 0) {
             console.log(`[Circuit Breaker] Cancelando órdenes y cerrando ${p.symbol}...`);
-            await cancelAllOrders(venue, p.symbol, 'linear').catch(() => {});
+            await cancelAllOrders(venue, p.symbol, 'linear').catch(() => { });
             await executeOrder(venue, {
               symbol: p.symbol,
               side: p.side === 'buy' ? 'sell' : 'buy',
@@ -187,7 +187,7 @@ async function runDaemonIteration(mode?: string) {
               type: 'market',
               category: 'linear',
               reduceOnly: true
-            }).catch(() => {});
+            }).catch(() => { });
           }
         }
 
@@ -195,14 +195,14 @@ async function runDaemonIteration(mode?: string) {
           for (const c of balance.coins) {
             if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
               const spotSymbol = `${c.symbol}USDT`;
-              await cancelAllOrders(venue, spotSymbol, 'spot').catch(() => {});
+              await cancelAllOrders(venue, spotSymbol, 'spot').catch(() => { });
               await executeOrder(venue, {
                 symbol: spotSymbol,
                 side: 'sell',
                 qty: c.balance,
                 type: 'market',
                 category: 'spot'
-              }).catch(() => {});
+              }).catch(() => { });
             }
           }
         }
@@ -215,7 +215,7 @@ async function runDaemonIteration(mode?: string) {
       // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
       if ((futures <= 0 && balance.cash > 0) || pnlPercentage <= SYSTEM_THRESHOLDS.DAMAGE_CONTROL_PNL) {
         isDamageControl = true;
-        console.log(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage*100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage * 100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
       }
 
       // Registrar Snapshot en BD
@@ -255,13 +255,24 @@ async function runDaemonIteration(mode?: string) {
         }
       }
 
-      console.log(`${LOG_PREFIX.SISTEMA} Estado actual de mercados detectado: ${currentState}`);
+      const cosmeticStateMap: Record<string, string> = {
+        'CRYPTO_ALWAYS_OPEN': 'Mercado Crypto (24/7)',
+        'MARKET_OPEN': 'Mercado Tradicional Abierto (Wall Street/BYMA)',
+        'PRE_MARKET_SYNC': 'Mercado Cerrado: Analizando Pre-Market',
+        'AFTER_HOURS_REVIEW': 'Mercado Cerrado: Analizando Post-Market',
+        'RESEARCH_MODE': 'Mercado Cerrado: Investigación Profunda',
+        'PORTFOLIO_AUDIT': 'Auditoría Estricta de Portafolio'
+      };
+      const prettyState = cosmeticStateMap[currentState] || currentState;
+
+      console.log(`${LOG_PREFIX.SISTEMA} Modo de Operación Actual: ${prettyState}`);
+
 
       marketContext += `\n\n**ESTADO DE TU BILLETERA REAL EN ${venue.toUpperCase()}:**\n`;
       marketContext += `- Poder Spot Disponible (Liquidez Real para Operar): ${availableSpot.toFixed(2)}\n`;
       if (frozenReserve > 0) marketContext += `- Fondos en Reserva Intocable (FROZEN): ${frozenReserve.toFixed(2)} (PROHIBIDO TOCAR)\n`;
       marketContext += `- Poder Futuros (Garantía): ${futures.toFixed(2)}\n`;
-      
+
       if (activeChallenge) {
         marketContext = `**[ MISIÓN ACTUAL DE LA BÓVEDA (${venue.toUpperCase()}) ]**\n🎯 ${activeChallenge.title}\n📜 ${activeChallenge.description}\n📈 Meta de Patrimonio Total: ${activeChallenge.targetMetric}\n💰 Patrimonio Total Actual: ${balance.cash.toFixed(2)}\n\n` + marketContext;
       }
@@ -330,16 +341,16 @@ async function runDaemonIteration(mode?: string) {
       if (scrappyConf.active && venue === 'bybit') {
         const scrappyReport = await MissionService.getScrappyReport();
         if (scrappyReport && scrappyReport !== "Sin reportes recientes. Esperando órdenes.") {
-           marketContext += `\n\n**MENSAJE URGENTE DE SCRAPPY (Ejecutor HFT):**\n${scrappyReport}\n(Evalúa si quieres apagarlo, subirle el budget, o dejarlo corriendo solo).`;
-           await MissionService.setScrappyReport("Sin reportes recientes. Esperando órdenes."); // Borrar buzón tras leerlo
+          marketContext += `\n\n**MENSAJE URGENTE DE SCRAPPY (Ejecutor HFT):**\n${scrappyReport}\n(Evalúa si quieres apagarlo, subirle el budget, o dejarlo corriendo solo).`;
+          await MissionService.setScrappyReport("Sin reportes recientes. Esperando órdenes."); // Borrar buzón tras leerlo
         }
       }
 
       const scrappyExclusion = scrappyConf.active && venue === 'bybit' ? ` IGNORA y NO CIERRES la posición en ${scrappyConf.targetAsset} porque es gestionada independientemente por el bot HFT Scrappy (no requiere thesis).` : '';
 
-      const agentPrompt = isDamageControl 
+      const agentPrompt = isDamageControl
         ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.${scrappyExclusion}`
-        : (currentState === 'PORTFOLIO_AUDIT' 
+        : (currentState === 'PORTFOLIO_AUDIT'
           ? `ESTÁS EN AUDITORÍA DE PORTAFOLIO. Lee la 'thesis' de cada posición abierta de tus herramientas. Compara con los precios actuales. CIERRA las posiciones si la tesis falló. NO ABRAS NUEVAS. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.${scrappyExclusion}`
           : `Analiza los reportes de tus sub-agentes y el estado del mercado. Tómate el tiempo necesario para pensar. Quiero decisiones QUIRÚRGICAS, basadas en fundamentos técnicos y lógicos, respaldadas por información verificable. Tu análisis debe ser exhaustivo, claro, metodológico, experto y profesional. Tu objetivo es sobrevivir, no perder capital y maximizar tu portafolio de forma inteligente. En modo crypto, operas 24/7 sin descanso. REGLA ESTRICTA: SOLO estás autorizado a operar en el broker activo: ${venue.toUpperCase()}. Ignora tu balance en otros brokers.${scrappyExclusion}`);
 
@@ -349,14 +360,34 @@ async function runDaemonIteration(mode?: string) {
       );
 
       console.log(`${LOG_PREFIX.CEO_TRADER} Respuesta obtenida y ciclo cerrado.\x1b[0m`);
-      
+
       let finalContent = typeof agentResponse === 'string' ? agentResponse : (agentResponse?.content || '');
-      
+
       const titleMatch = finalContent.match(/\[T[IÍ]TULO:([^\]]+)\]/i);
       if (titleMatch) {
         console.log(`${LOG_PREFIX.AUDITORIA} ${titleMatch[1].trim()}${ANSI_COLORS.RESET}`);
       } else {
         console.log(`${LOG_PREFIX.AUDITORIA} Ciclo completado sin acciones.${ANSI_COLORS.RESET}`);
+        if (finalContent.length > 0) {
+          console.log(`\n${LOG_PREFIX.CEO_TRADER} ${ANSI_COLORS.CYAN}(Pensamiento Interno no estructurado):${ANSI_COLORS.RESET}`);
+          
+          let displayContent = finalContent;
+          if (displayContent.startsWith('{') && displayContent.includes('}')) {
+             try {
+                // Si accidentalmente devuelve un JSON (como el reporte del Experto SMART)
+                const parsed = JSON.parse(displayContent);
+                displayContent = JSON.stringify(parsed, null, 2);
+             } catch(e) {}
+          }
+          
+          // Limpiar exceso de saltos de línea y truncar si es muy largo
+          displayContent = displayContent.replace(/\n{3,}/g, '\n\n').trim();
+          if (displayContent.length > 400) {
+              displayContent = displayContent.substring(0, 400) + `\n\n${ANSI_COLORS.GRAY}... [Texto truncado por longitud excesiva]${ANSI_COLORS.RESET}`;
+          }
+          
+          console.log(`${ANSI_COLORS.CYAN}${displayContent}${ANSI_COLORS.RESET}\n`);
+        }
       }
 
 
@@ -365,41 +396,41 @@ async function runDaemonIteration(mode?: string) {
 
       // Si el objetivo es 0 (primera ejecución para este broker), inicializarlo dinámicamente
       if (activeChallenge && activeChallenge.targetMetric === 0) {
-         await MissionService.setCycleStep(venue, 0);
-         await MissionService.setWorkingCapital(venue, effectiveEquity);
-         
-         const currentPercentage = MissionService.TIER_PERCENTAGES[0];
-         const initialTarget = MissionService.SALARY_RESERVE + (effectiveEquity * (1 + currentPercentage));
-         
-         await MissionService.setCurrentTarget(venue, initialTarget);
-         activeChallenge.targetMetric = initialTarget;
-         console.log(`\n${ANSI_COLORS.CYAN}🎯 Hito autogenerado para ${venue.toUpperCase()}: Meta Efectiva inicial fijada en $${initialTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
+        await MissionService.setCycleStep(venue, 0);
+        await MissionService.setWorkingCapital(venue, effectiveEquity);
+
+        const currentPercentage = MissionService.TIER_PERCENTAGES[0];
+        const initialTarget = MissionService.SALARY_RESERVE + (effectiveEquity * (1 + currentPercentage));
+
+        await MissionService.setCurrentTarget(venue, initialTarget);
+        activeChallenge.targetMetric = initialTarget;
+        console.log(`\n${ANSI_COLORS.CYAN}🎯 Hito autogenerado para ${venue.toUpperCase()}: Meta Efectiva inicial fijada en $${initialTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
       }
 
       // Evaluar Victoria sobre el PATRIMONIO EFECTIVO
       if (activeChallenge && activeChallenge.targetMetric > 0 && effectiveEquity >= activeChallenge.targetMetric) {
         console.log(`\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 ¡HITO LOGRADO EN ${venue.toUpperCase()}! 🎉${ANSI_COLORS.RESET}`);
         console.log(`${ANSI_COLORS.GREEN}Meta Efectiva alcanzada: $${effectiveEquity.toFixed(2)} / $${activeChallenge.targetMetric.toFixed(2)}${ANSI_COLORS.RESET}`);
-        
+
         const newFrozen = frozenReserve + MissionService.SALARY_RESERVE;
         await MissionService.setFrozenReserve(venue, newFrozen);
-        
+
         const newWorkingCapital = effectiveEquity - MissionService.SALARY_RESERVE;
         await MissionService.setWorkingCapital(venue, newWorkingCapital);
-        
+
         let step = await MissionService.getCycleStep(venue);
         step++;
         await MissionService.setCycleStep(venue, step);
-        
+
         const nextPercentage = MissionService.TIER_PERCENTAGES[step % MissionService.TIER_PERCENTAGES.length];
         const newTarget = MissionService.SALARY_RESERVE + (newWorkingCapital * (1 + nextPercentage));
         await MissionService.setCurrentTarget(venue, newTarget);
-        
+
         const nextTier = activeChallenge.tier + 1;
         await MissionService.setActiveTier(venue, nextTier);
-        
+
         console.log(`${ANSI_COLORS.CYAN}Sueldo de $${MissionService.SALARY_RESERVE} asegurado. Reserva Total: $${newFrozen.toFixed(2)}.${ANSI_COLORS.RESET}`);
-        console.log(`${ANSI_COLORS.CYAN}Avanzando al Tier ${nextTier} (${(nextPercentage*100).toFixed(0)}%). Nueva meta efectiva: $${newTarget.toFixed(2)}.${ANSI_COLORS.RESET}\n`);
+        console.log(`${ANSI_COLORS.CYAN}Avanzando al Tier ${nextTier} (${(nextPercentage * 100).toFixed(0)}%). Nueva meta efectiva: $${newTarget.toFixed(2)}.${ANSI_COLORS.RESET}\n`);
       }
 
     } // Fin bucle venues
@@ -467,14 +498,21 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
       }
     }
 
-    console.log(`Durmiendo por ${currentInterval} segundos...`);
+    console.log(`\n${LOG_PREFIX.SISTEMA} ⏳ El CEO entró en espera estratégica por ${currentInterval} segundos...`);
+
+    // Si Scrappy está inactivo, lo aclaramos para no generar confusión sobre qué está haciendo.
+    // Si está activo, no hace falta aclarar porque Scrappy floodea la consola con sus radares.
+    const scrappyState = StateService.getScrappyState();
+    if (!scrappyState.active) {
+      console.log(`${LOG_PREFIX.SCRAPPY} 💤 Mantenimiento en progreso (APAGADO). A la espera de directivas del CEO.\n`);
+    }
     await new Promise(resolve => setTimeout(resolve, currentInterval * 1000));
   }
 }
 
 if (require.main === module) {
   const modeArg = process.argv.includes(TRADING_MODES.CRYPTO) ? TRADING_MODES.CRYPTO : undefined;
-  
+
   // Scrappy se inicia en todos los modos (tanto regular como crypto)
   startScrappyDaemon().catch(console.error);
 

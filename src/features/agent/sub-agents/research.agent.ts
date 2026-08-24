@@ -8,6 +8,7 @@ import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 const RESEARCH_MANDATE = `Eres el Research Agent del fondo cuantitativo.
 Tu único propósito es utilizar tus herramientas de búsqueda para sintetizar el contexto macroeconómico actual y eventos que afecten los mercados.
 Debes retornar un informe estructurado y conciso en texto con los hallazgos clave. No asumas ni inventes datos.
+SIEMPRE debes escribir el reporte final en texto plano en tu campo "content", incluso si las herramientas fallan (en cuyo caso explicarás el fallo). NUNCA devuelvas una respuesta vacía.
 
 PROHIBICIÓN ESTRICTA: Solo puedes usar las herramientas provistas explícitamente (serper_search y tavily_research). NO intentes invocar herramientas inexistentes como 'open_file', 'browser' o 'read_url'. Basate únicamente en el contenido de los resúmenes que te devuelven tus herramientas.`;
 
@@ -92,8 +93,10 @@ export async function runResearchAgent(query: string): Promise<string> {
     iterations++;
   }
 
-  const finalReport = responseMessage?.content || 'No se pudo generar un reporte de investigación.';
-  if (finalReport) {
+  const finalReport = (responseMessage?.content && responseMessage.content.trim().length > 0) 
+    ? responseMessage.content 
+    : 'No se pudo generar un reporte de investigación (El LLM no devolvió texto).';
+  if (finalReport && !finalReport.startsWith('No se')) {
     // Tomamos solo la primera oración para mostrar en consola como resumen
     const firstSentence = finalReport.split('.')[0] + '.';
     console.log(`${ANSI_COLORS.MAGENTA}[Richard Newman]${ANSI_COLORS.RESET} Resumen de investigación: ${firstSentence}`);

@@ -6,6 +6,7 @@ export class StateService {
   private static scrappyTargetAsset = 'BTCUSDT';
   private static scrappyBudget = 200; // Presupuesto de $200 USD
   private static scrappyTarget = 20; // Meta de ganancias (10% por defecto)
+  private static scrappyDirective: string | null = null; // Grito directo del CEO
 
   static getCurrentCryptoAsset(): string {
     return this.currentCryptoAsset;
@@ -39,5 +40,16 @@ export class StateService {
 
     if (target && target > 0) this.scrappyTarget = target;
     console.log(`[StateService] Scrappy Config Actualizada: Activo=${this.scrappyActive}, Asset=${this.scrappyTargetAsset}, Budget=${this.scrappyBudget}, Target=${this.scrappyTarget}`);
+  }
+
+  static getScrappyDirective(): string | null {
+    return this.scrappyDirective;
+  }
+
+  static setScrappyDirective(directive: string | null): void {
+    this.scrappyDirective = directive;
+    if (directive) {
+      console.log(`[StateService] 📢 NUEVA DIRECTIVA DEL CEO PARA SCRAPPY: "${directive}"`);
+    }
   }
 }

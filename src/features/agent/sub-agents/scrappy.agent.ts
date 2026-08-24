@@ -34,11 +34,16 @@ export async function runScrappyIteration() {
       // Bybit linear positions tienen side, si no lo inferimos del PnL
       pnlPct = myPosition.unrealizedPlPc * 100;
 
-      // Log "Anormal" (ganancia o pérdida notable > 0.5%)
-      if (Math.abs(pnlPct) >= 0.5) {
-        const now = Date.now();
-        if (now - lastLogTime > 60000) { // No floodear
-          console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🚨 RENTABILIDAD ANORMAL DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}`);
+      const now = Date.now();
+      if (now - lastLogTime > 30000) { // Logging táctico cada 30s
+        if (pnlPct >= 0.30 && pnlPct < 0.80) {
+          console.log(`${ANSI_COLORS.GREEN}🟢 [Scrappy Radar] Zona de Tolerancia alcanzada (+${pnlPct.toFixed(2)}%). Evaluando Take Profit anticipado...${ANSI_COLORS.RESET}`);
+          lastLogTime = now;
+        } else if (pnlPct <= -1.00 && pnlPct > -1.50) {
+          console.log(`${ANSI_COLORS.RED}🔴 [Scrappy Radar] Drawdown profundo detectado (${pnlPct.toFixed(2)}%). Acercándose a zona DCA (-1.50%)...${ANSI_COLORS.RESET}`);
+          lastLogTime = now;
+        } else if (Math.abs(pnlPct) >= 1.50) {
+          console.log(`${ANSI_COLORS.MAGENTA}[Scrappy] 🚨 RENTABILIDAD CRÍTICA DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}${ANSI_COLORS.RESET}`);
           lastLogTime = now;
         }
       }
@@ -47,18 +52,26 @@ export async function runScrappyIteration() {
       await cancelAllOrders('bybit', symbol, 'linear').catch(() => { });
     }
 
+    let directiveText = "";
+    const ceoDirective = StateService.getScrappyDirective();
+    if (ceoDirective) {
+      console.log(`${ANSI_COLORS.YELLOW}⚡ [Scrappy] ¡Grito del CEO recibido ("${ceoDirective}")! Inyectando orden de emergencia en el motor HFT...${ANSI_COLORS.RESET}`);
+      directiveText = `\n\n🚨 [DIRECTIVA URGENTE DEL CEO]: "${ceoDirective}"\n¡DEBES OBEDECER ESTA INSTRUCCIÓN INMEDIATAMENTE EN TU PRÓXIMA ACCIÓN!`;
+      StateService.setScrappyDirective(null); // Consumir el mensaje
+    }
+
     const systemPrompt = `Eres Scrappy, un Scalp Trader HFT ultrarrápido.
 Tu objetivo es acumular micro-ganancias. Operas en Bybit. Presupuesto asignado: $${config.budget}.
 Tu estado actual:
 - Posición abierta: ${myPosition ? `${myPosition.side?.toUpperCase() || 'ACTIVA'} en ${myPosition.avgEntryPrice}` : 'NINGUNA'}
 - PnL Flotante: ${pnlPct.toFixed(3)}%
 - Activo objetivo: ${symbol}
-- Precio Actual: BID ${priceData.bid} / ASK ${priceData.ask} / SPREAD ${spreadPct.toFixed(4)}%
+- Precio Actual: BID ${priceData.bid} / ASK ${priceData.ask} / SPREAD ${spreadPct.toFixed(4)}%${directiveText}
 
 Reglas Críticas:
 1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad.
-2. Si tienes posición y el PnL Flotante Bruto es >= +0.15% (profit), CIERRA inmediatamente. Esto asegura cubrir el ~0.10% de comisiones del exchange y dejar un neto positivo.
-3. Si el PnL Flotante Bruto es <= -0.50% (loss), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. No cierres en pérdida, ¡promedia!
+2. Si tienes posición y el PnL Flotante Bruto es >= +0.80% (profit óptimo), CIERRA inmediatamente. [TOLERANCIA DINÁMICA]: Si estás por encima de +0.30% y notas que el mercado pierde fuerza o lateraliza, tienes autorización para CERRAR anticipadamente y asegurar la ganancia para evitar el Síndrome del Casi.
+3. Si el PnL Flotante Bruto es <= -1.50% (loss profundo), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. Dale espacio al precio para respirar antes de intervenir. No cierres en pérdida.
 4. NO PIENSES. NO RAZONES. NO EXPLIQUES NADA.
 5. Tu ÚNICA salida permitida es invocar la herramienta 'scalp_action' INMEDIATAMENTE. No escribas texto antes ni después.`;
 
@@ -129,6 +142,10 @@ async function executeScalpAction(
     if (action === 'HOLD' || action === 'WAIT') return;
 
     if (action === 'CLOSE_POSITION' && myPosition) {
+      // 🛡️ SALVAGUARDA MATEMÁTICA: Prohibido Take Profit prematuro
+      if (pnlPct >= 0 && pnlPct < 0.30) {
+        return; // Anular orden silenciosamente
+      }
       if (pnlPct >= 0) {
         // TAKE PROFIT: LIMIT POST-ONLY MAKER ORDER
         const limitPrice = myPosition.side === 'buy' ? priceData.ask : priceData.bid;
@@ -185,6 +202,11 @@ async function executeScalpAction(
       const now = Date.now();
       if (now - lastActionTime < 5000) {
         return; // Cooldown de 5 segundos para evitar spam
+      }
+
+      // 🛡️ SALVAGUARDA MATEMÁTICA: Prohibido DCA prematuro
+      if (myPosition && pnlPct > -1.50) {
+        return; // Anular orden silenciosamente
       }
 
       const currentPrice = action === 'OPEN_LONG' ? priceData.ask : priceData.bid;

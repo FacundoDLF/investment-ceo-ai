@@ -75,7 +75,13 @@ export async function createChatCompletionWithRetry(
     } catch (error: any) {
       const isRateLimit = error?.status === 429 || error?.status === 413;
       const isNetworkError = !error?.status || error?.status >= 500 || error?.name === 'APITimeoutError';
-      const isToolUseFailed = error?.status === 400 && (error?.error?.code === 'tool_use_failed' || error?.message?.includes('tool call'));
+      const errorString = JSON.stringify(error || {});
+      const isToolUseFailed = error?.status === 400 && (
+        error?.error?.code === 'tool_use_failed' || 
+        error?.message?.includes('tool call') ||
+        errorString.includes('tool_use_failed') ||
+        errorString.includes('Tool choice is required')
+      );
       const isModelError = error?.status === 404 || error?.status === 403 || (error?.status === 400 && !isToolUseFailed);
 
       if (isToolUseFailed) {

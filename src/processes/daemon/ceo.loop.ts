@@ -230,7 +230,7 @@ async function runDaemonIteration(mode?: string) {
       if (isDamageControl) {
         currentState = 'DAMAGE_CONTROL';
         marketContext = DAMAGE_CONTROL_MANDATE;
-      } else if (iterationCount % 5 === 0) {
+      } else if (iterationCount === 1 || iterationCount % 5 === 0) {
         currentState = 'PORTFOLIO_AUDIT';
         marketContext = MARKET_STATES.PORTFOLIO_AUDIT;
         console.log(`${LOG_PREFIX.SISTEMA} 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})${ANSI_COLORS.RESET}`);

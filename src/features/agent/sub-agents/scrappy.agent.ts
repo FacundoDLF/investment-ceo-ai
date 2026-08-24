@@ -36,7 +36,7 @@ export async function runScrappyIteration() {
 
       const now = Date.now();
       if (now - lastLogTime > 30000) { // Logging táctico cada 30s
-        if (pnlPct >= 0.30 && pnlPct < 0.80) {
+        if (pnlPct >= 0.50 && pnlPct < 0.80) {
           console.log(`${ANSI_COLORS.GREEN}🟢 [Scrappy Radar] Zona de Tolerancia alcanzada (+${pnlPct.toFixed(2)}%). Evaluando Take Profit anticipado...${ANSI_COLORS.RESET}`);
           lastLogTime = now;
         } else if (pnlPct <= -1.00 && pnlPct > -1.50) {
@@ -70,7 +70,7 @@ Tu estado actual:
 
 Reglas Críticas:
 1. Si no tienes posición y el spread es bajo, puedes ABRIR (buy o sell) si ves oportunidad.
-2. Si tienes posición y el PnL Flotante Bruto es >= +0.80% (profit óptimo), CIERRA inmediatamente. [TOLERANCIA DINÁMICA]: Si estás por encima de +0.30% y notas que el mercado pierde fuerza o lateraliza, tienes autorización para CERRAR anticipadamente y asegurar la ganancia para evitar el Síndrome del Casi.
+2. Si tienes posición y el PnL Flotante Bruto es >= +0.80% (profit óptimo), CIERRA inmediatamente. [TOLERANCIA DINÁMICA]: Si estás por encima de +0.50% y notas que el mercado pierde fuerza o lateraliza, tienes autorización para CERRAR anticipadamente y asegurar la ganancia para evitar el Síndrome del Casi.
 3. Si el PnL Flotante Bruto es <= -1.50% (loss profundo), AÑADE a la posición (DCA: OPEN_LONG si estabas en long) para promediar a la baja. Dale espacio al precio para respirar antes de intervenir. No cierres en pérdida.
 4. NO PIENSES. NO RAZONES. NO EXPLIQUES NADA.
 5. Tu ÚNICA salida permitida es invocar la herramienta 'scalp_action' INMEDIATAMENTE. No escribas texto antes ni después.`;
@@ -143,7 +143,7 @@ async function executeScalpAction(
 
     if (action === 'CLOSE_POSITION' && myPosition) {
       // 🛡️ SALVAGUARDA MATEMÁTICA: Prohibido Take Profit prematuro
-      if (pnlPct >= 0 && pnlPct < 0.30) {
+      if (pnlPct >= 0 && pnlPct < 0.50) {
         return; // Anular orden silenciosamente
       }
       if (pnlPct >= 0) {

@@ -56,8 +56,8 @@ export async function executeCommandScrappy(args: string): Promise<any> {
       const bMult = budgetMultiplier !== undefined ? budgetMultiplier : 0.2;
       const tMult = targetMultiplier !== undefined ? targetMultiplier : 0.1;
       
-      // Fórmula de Riesgo Escalonada: Budget = BaseCapital * ((BaseCapital / 1000) * budgetMultiplier)
-      budget = baseCapital * ((baseCapital / 1000) * bMult);
+      // Fórmula de Riesgo Lineal: Budget = BaseCapital * budgetMultiplier
+      budget = baseCapital * bMult;
       
       try {
         const bybitBal = await getUnifiedBalance('bybit');

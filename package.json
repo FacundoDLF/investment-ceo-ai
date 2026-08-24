@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "ceo": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts --watch",
-    "ceo:crypto": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts crypto --watch"
+    "ceo:crypto": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts crypto --watch",
+    "chat": "npx tsx --env-file=.env src/processes/scripts/chat-ceo.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

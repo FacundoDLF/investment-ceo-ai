@@ -3,6 +3,7 @@ import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { getUnifiedPositions, executeOrder, VenueName } from '@/features/venues/venue.service';
 import { prisma } from '@/shared/lib/prisma';
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
+import { MissionService } from '@/features/agent/services/mission.service';
 
 export const closePositionSchema = z.object({
   venue: z.enum(['alpaca', 'bybit']).describe('Venue donde se encuentra la posición'),
@@ -68,6 +69,10 @@ export async function executeClosePosition(args: string): Promise<any> {
     }
 
     const side = isShort ? 'buy' : 'sell';
+
+    // Estimar PnL Realizado antes de cerrar
+    const realizedPnlEstimate = (position.unrealizedPl || 0) * (params.percentage / 100);
+    await MissionService.addLifetimeCeoPnL(params.venue as VenueName, realizedPnlEstimate);
 
     // Ejecutar la orden de cierre
     const result = await executeOrder(params.venue as VenueName, {

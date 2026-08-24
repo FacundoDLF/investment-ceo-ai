@@ -2,6 +2,7 @@ import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { executeOrder, getMarketPrice, getInstrumentInfo } from '@/features/venues/venue.service';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { StateService } from '../services/state.service';
+import { MissionService } from '../services/mission.service';
 import { prisma } from '@/shared/lib/prisma';
 
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
@@ -106,7 +107,7 @@ Reglas Críticas:
           }
         }
 
-        await executeScalpAction(action, symbol, config.budget, priceData, myPosition, pnlPct);
+        await executeScalpAction(action, symbol, config, priceData, myPosition, pnlPct);
       }
     }
 
@@ -118,7 +119,7 @@ Reglas Críticas:
 async function executeScalpAction(
   action: string,
   symbol: string,
-  budget: number,
+  config: any,
   priceData: { bid: number, ask: number },
   myPosition: Position | undefined,
   pnlPct: number
@@ -176,7 +177,7 @@ async function executeScalpAction(
       }
 
       const currentPrice = action === 'OPEN_LONG' ? priceData.ask : priceData.bid;
-      let qty = budget / currentPrice;
+      let qty = config.budget / currentPrice;
 
       try {
         const info = await getInstrumentInfo('bybit', symbol);

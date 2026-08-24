@@ -7,6 +7,7 @@ import { consultAnalystTool, executeConsultAnalyst } from '@/features/agent/tool
 import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/agent/tools/validate-trade-intent.tool';
 import { closePositionTool, executeClosePosition } from '@/features/agent/tools/close-position.tool';
 import { commandScrappyTool, executeCommandScrappy } from '@/features/agent/tools/command-scrappy.tool';
+import { registerWithdrawalTool, executeRegisterWithdrawal } from '@/features/agent/tools/register-withdrawal.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
@@ -38,7 +39,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       response = await createChatCompletionWithRetry({
         role: 'CEO',
         messages: currentMessages,
-        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool],
+        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool, registerWithdrawalTool],
       });
     } catch (error: any) {
       if ((error.status === 400 && error.message?.includes('tool call validation failed')) || 

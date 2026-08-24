@@ -5,6 +5,7 @@ export class StateService {
   private static scrappyActive = false; // Por defecto apagado, CEO debe encenderlo
   private static scrappyTargetAsset = 'BTCUSDT';
   private static scrappyBudget = 10000; // Presupuesto de $10000 USD
+  private static scrappyTarget = 20; // Meta de ganancias
 
   static getCurrentCryptoAsset(): string {
     return this.currentCryptoAsset;
@@ -19,14 +20,16 @@ export class StateService {
     return {
       active: this.scrappyActive,
       targetAsset: this.scrappyTargetAsset,
-      budget: this.scrappyBudget
+      budget: this.scrappyBudget,
+      target: this.scrappyTarget
     };
   }
 
-  static setScrappyConfig(active: boolean, asset?: string, budget?: number): void {
+  static setScrappyConfig(active: boolean, asset?: string, budget?: number, target?: number): void {
     this.scrappyActive = active;
     if (asset) this.scrappyTargetAsset = asset.toUpperCase();
     if (budget && budget > 0) this.scrappyBudget = budget;
-    console.log(`[StateService] Scrappy Config Actualizada: Activo=${this.scrappyActive}, Asset=${this.scrappyTargetAsset}, Budget=$${this.scrappyBudget}`);
+    if (target && target > 0) this.scrappyTarget = target;
+    console.log(`[StateService] Scrappy Config Actualizada: Activo=${this.scrappyActive}, Asset=${this.scrappyTargetAsset}, Budget=${this.scrappyBudget}, Target=${this.scrappyTarget}`);
   }
 }

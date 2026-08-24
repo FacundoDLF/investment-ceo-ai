@@ -89,3 +89,24 @@
 * **Problema:** El adaptador de Bybit intenta enviar una orden `reduceOnly: true` para una posición que ya es 0. Bybit devuelve error, el adaptador lanza un Throw, y la herramienta captura el error pero imprime el stack trace completo con `console.error(error)` ensuciando gravemente los logs de la consola del usuario.
 * **Solución:** En `close-position.tool.ts` se modificó el bloque catch para imprimir únicamente un string amigable `console.error('❌ Error en close_position: ' + error.message)` sin el stack trace completo.
 * **REGLA:** Las herramientas (tools) llamadas por agentes NUNCA deben imprimir stack traces completos (`console.error(error)`) en caso de errores operativos de API. Siempre deben formatear el error como texto simple para mantener la estética de la consola y devolver el JSON del error al LLM.
+
+---
+
+## 4. Gamificación y Contabilidad de Retiros (Patrimonio Efectivo)
+
+### [DECISIÓN] Patrimonio Efectivo vs Total Equity
+* **Contexto:** El CEO tiene un sistema de gamificación ("Misiones") que le exige generar un porcentaje de crecimiento escalonado (5%, 10%, 15%...). Además, cada vez que cumple una meta, "congela" $4500 USD como "Sueldo del Humano".
+* **Solución Arquitectónica:** Para evitar que el crecimiento exponencial se descontrole calculando % sobre fondos que el usuario va a retirar, se implementó el concepto de **Patrimonio Efectivo (Effective Equity)**. 
+  - `Effective Equity = Total Balance - Frozen Reserve`
+  - La meta neta se calcula siempre sobre este Capital de Trabajo descontado.
+* **REGLA:** NUNCA calcules metas de ganancia o evalúes el éxito de un hito utilizando el balance bruto (`balance.cash`). SIEMPRE utiliza la fórmula `(balance.cash - frozenReserve) >= targetMetric`.
+
+### [ISSUE] Desfase de Caché (Ghost Loops) al usar `tsx --watch` en Windows
+* **Contexto:** Se parcheó el archivo `ceo.loop.ts` en caliente mientras el usuario tenía la terminal corriendo con `npx tsx --watch`.
+* **Problema:** En entornos Windows, `tsx --watch` a veces no detecta el cambio de archivo instantáneamente o se queda trabado. El demonio viejo siguió ejecutándose en memoria, sobrescribiendo la Base de Datos con lógicas obsoletas (ej. fijando un Frozen Reserve hardcodeado) antes de que el usuario reiniciara manualmente la consola.
+* **Solución:** Se tuvo que ejecutar un script de purga en Prisma (`reset-gamification.ts`) para borrar los registros fantasma `FROZEN_RESERVE` y `CYCLE_STEP` y forzar al nuevo demonio a inicializar los hitos correctamente.
+* **REGLA:** Tras aplicar parches críticos de arquitectura en los loops de los demonios, siempre debes notificar al usuario que detenga (Ctrl+C) y reinicie el proceso manualmente. No confíes ciegamente en el hot-reload de `--watch` para cambios estructurales en memoria.
+
+### [DECISIÓN] Doble Factor Contable para Retiros (Herramienta de Chat)
+* **Contexto:** Si el usuario retira dinero físicamente de su Broker al banco, el bot detectaría una caída masiva de capital y entraría en modo Damage Control o desfasaría su métrica de crecimiento.
+* **Solución:** Se creó el script `chat-ceo.ts` y la herramienta `register_withdrawal`. En lugar de escanear la API buscando retiros confusos (Transferencias vs Extracciones On-Chain), el usuario debe usar `npm run chat "Retiré $4500"`. El CEO lo procesa, deduce los $4500 de la Reserva Intocable, y el Effective Equity se mantiene matemáticamente intacto.

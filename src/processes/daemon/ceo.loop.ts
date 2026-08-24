@@ -8,6 +8,7 @@ import { runResearchAgent } from '@/features/agent/sub-agents/research.agent';
 import { runQuantAgent } from '@/features/agent/sub-agents/quant.agent';
 import { runMarketScanner } from '@/features/agent/sub-agents/market-scanner.agent';
 import { StateService } from '@/features/agent/services/state.service';
+import { MissionService } from '@/features/agent/services/mission.service';
 import { prisma } from '@/shared/lib/prisma';
 import { getUnifiedBalance, getUnifiedPositions, getClosedPositionInfo, VenueName, executeOrder, cancelAllOrders } from '@/features/venues/venue.service';
 import { DAMAGE_CONTROL_MANDATE } from '@/features/agent/config/ceo.mandate';
@@ -53,6 +54,7 @@ let lastScannerTime = 0;
 let cachedScannerReport = "Aún no hay reporte del escáner de mercado.";
 
 let iterationCount = 0;
+let scrappyInactiveIterations = 0;
 let lastLoggedCoinsHash = "";
 let lastPositionsMap: Record<string, Record<string, any>> = { alpaca: {}, bybit: {} };
 const frozenVenues: Set<VenueName> = new Set();
@@ -94,9 +96,15 @@ async function runDaemonIteration(mode?: string) {
       console.log(`\n${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}========== [ EVALUANDO CARTERA: ${venue.toUpperCase()} ] ==========${ANSI_COLORS.RESET}`);
       console.log(`${LOG_PREFIX.SISTEMA} Consultando estado de billetera real en ${venue}...`);
       const balance = await getUnifiedBalance(venue);
+      const frozenReserve = await MissionService.getFrozenReserve(venue);
+      const activeChallenge = await MissionService.getActiveChallenge(venue);
+      
       const spot = balance.spotPower || 0;
+      let availableSpot = spot - frozenReserve;
+      if (availableSpot < 0) availableSpot = 0;
+
       const futures = balance.dayTradingPower || 0;
-      const hasCapital = spot >= 10 || futures >= 10;
+      const hasCapital = availableSpot >= 10 || futures >= 10;
 
       let currentState: string;
       let marketContext: string;
@@ -238,10 +246,28 @@ async function runDaemonIteration(mode?: string) {
       console.log(`${LOG_PREFIX.SISTEMA} Estado actual de mercados detectado: ${currentState}`);
 
       marketContext += `\n\n**ESTADO DE TU BILLETERA REAL EN ${venue.toUpperCase()}:**\n`;
-      marketContext += `- Poder Spot (Liquidez): $${spot.toFixed(2)}\n`;
-      marketContext += `- Poder Futuros (Garantía): $${futures.toFixed(2)}\n`;
+      marketContext += `- Poder Spot Disponible (Liquidez Real para Operar): ${availableSpot.toFixed(2)}\n`;
+      if (frozenReserve > 0) marketContext += `- Fondos en Reserva Intocable (FROZEN): ${frozenReserve.toFixed(2)} (PROHIBIDO TOCAR)\n`;
+      marketContext += `- Poder Futuros (Garantía): ${futures.toFixed(2)}\n`;
+      
+      if (activeChallenge) {
+        marketContext = `**[ MISIÓN ACTUAL DE LA BÓVEDA (${venue.toUpperCase()}) ]**\n🎯 ${activeChallenge.title}\n📜 ${activeChallenge.description}\n📈 Meta de Patrimonio Total: ${activeChallenge.targetMetric}\n💰 Patrimonio Total Actual: ${balance.cash.toFixed(2)}\n\n` + marketContext;
+      }
       if (!hasCapital) {
         marketContext += `\n⚠️ **ATENCIÓN: CAPITAL INSUFICIENTE.** No tienes saldo disponible para abrir nuevas posiciones. Tu prioridad absoluta debe ser decidir si esperas o si cierras posiciones activas para liberar capital. No intentes analizar nuevas compras.\n`;
+      }
+
+      if (venue === 'bybit') {
+        const scrappyConfig = StateService.getScrappyState();
+        if (!scrappyConfig.active) {
+          scrappyInactiveIterations++;
+        } else {
+          scrappyInactiveIterations = 0;
+        }
+
+        if (scrappyInactiveIterations >= 3) {
+          marketContext += `\n🚨 **ALERTA CRÍTICA:** Scrappy ha estado inactivo por ${scrappyInactiveIterations} iteraciones. ¡DESPIÉRTALO AHORA! Es OBLIGATORIO que uses 'command_scrappy' en esta respuesta para asignarle una Misión Fetch (Presupuesto y Meta), incluso si lo haces investigar BTCUSDT u otra moneda.\n`;
+        }
       }
 
       if (currentState !== 'RESEARCH_MODE') {
@@ -256,12 +282,12 @@ async function runDaemonIteration(mode?: string) {
 
       console.log(`${LOG_PREFIX.SISTEMA} Evaluando ejecución de Sub-Agentes...`);
 
-      // El quant agent analiza SPY por defecto en modo normal, o los activos actuales en modo crypto
-      const targetAsset = mode === TRADING_MODES.CRYPTO ? StateService.getCurrentCryptoAsset() : 'SPY';
+      // El quant agent analiza SPY en alpaca, o criptos en bybit
+      const targetAsset = venue === 'bybit' ? StateService.getCurrentCryptoAsset() : 'SPY';
       const assetsToAnalyze = new Set<string>();
       assetsToAnalyze.add(targetAsset);
 
-      if (mode === TRADING_MODES.CRYPTO && balance.coins) {
+      if (venue === 'bybit' && balance.coins) {
         balance.coins.forEach(c => {
           if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
             assetsToAnalyze.add(`${c.symbol}USDT`);
@@ -276,7 +302,7 @@ async function runDaemonIteration(mode?: string) {
         console.log(`${LOG_PREFIX.SISTEMA} Despertando a Rick Queen (Quant Agent) para analizar ${assetsArray.join(', ')}...`);
         quantReport = await runQuantAgent(assetsArray, venue);
       } else {
-        console.log(`${LOG_PREFIX.SISTEMA} Omitiendo a Rick Queen: Saldo insuficiente ($${spot.toFixed(2)} Spot / $${futures.toFixed(2)} Futuros).`);
+        console.log(`${LOG_PREFIX.SISTEMA} Omitiendo a Rick Queen: Saldo insuficiente (${availableSpot.toFixed(2)} Spot Disponible / ${futures.toFixed(2)} Futuros).`);
       }
 
       console.log(`${LOG_PREFIX.SISTEMA} Reportes listos. Entregando al CEO Trader para toma de decisiones...`);
@@ -308,6 +334,49 @@ async function runDaemonIteration(mode?: string) {
         console.log(`${LOG_PREFIX.AUDITORIA} ${titleMatch[1].trim()}${ANSI_COLORS.RESET}`);
       } else {
         console.log(`${LOG_PREFIX.AUDITORIA} Ciclo completado sin acciones.${ANSI_COLORS.RESET}`);
+      }
+
+
+      // === MILESTONE AUDITOR ===
+      const effectiveEquity = balance.cash - frozenReserve;
+
+      // Si el objetivo es 0 (primera ejecución para este broker), inicializarlo dinámicamente
+      if (activeChallenge && activeChallenge.targetMetric === 0) {
+         await MissionService.setCycleStep(venue, 0);
+         await MissionService.setWorkingCapital(venue, effectiveEquity);
+         
+         const currentPercentage = MissionService.TIER_PERCENTAGES[0];
+         const initialTarget = MissionService.SALARY_RESERVE + (effectiveEquity * (1 + currentPercentage));
+         
+         await MissionService.setCurrentTarget(venue, initialTarget);
+         activeChallenge.targetMetric = initialTarget;
+         console.log(`\n${ANSI_COLORS.CYAN}🎯 Hito autogenerado para ${venue.toUpperCase()}: Meta Efectiva inicial fijada en $${initialTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
+      }
+
+      // Evaluar Victoria sobre el PATRIMONIO EFECTIVO
+      if (activeChallenge && activeChallenge.targetMetric > 0 && effectiveEquity >= activeChallenge.targetMetric) {
+        console.log(`\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 ¡HITO LOGRADO EN ${venue.toUpperCase()}! 🎉${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.GREEN}Meta Efectiva alcanzada: $${effectiveEquity.toFixed(2)} / $${activeChallenge.targetMetric.toFixed(2)}${ANSI_COLORS.RESET}`);
+        
+        const newFrozen = frozenReserve + MissionService.SALARY_RESERVE;
+        await MissionService.setFrozenReserve(venue, newFrozen);
+        
+        const newWorkingCapital = effectiveEquity - MissionService.SALARY_RESERVE;
+        await MissionService.setWorkingCapital(venue, newWorkingCapital);
+        
+        let step = await MissionService.getCycleStep(venue);
+        step++;
+        await MissionService.setCycleStep(venue, step);
+        
+        const nextPercentage = MissionService.TIER_PERCENTAGES[step % MissionService.TIER_PERCENTAGES.length];
+        const newTarget = MissionService.SALARY_RESERVE + (newWorkingCapital * (1 + nextPercentage));
+        await MissionService.setCurrentTarget(venue, newTarget);
+        
+        const nextTier = activeChallenge.tier + 1;
+        await MissionService.setActiveTier(venue, nextTier);
+        
+        console.log(`${ANSI_COLORS.CYAN}Sueldo de $${MissionService.SALARY_RESERVE} asegurado. Reserva Total: $${newFrozen.toFixed(2)}.${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.CYAN}Avanzando al Tier ${nextTier} (${(nextPercentage*100).toFixed(0)}%). Nueva meta efectiva: $${newTarget.toFixed(2)}.${ANSI_COLORS.RESET}\n`);
       }
 
     } // Fin bucle venues

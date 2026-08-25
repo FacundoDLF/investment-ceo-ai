@@ -111,7 +111,10 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
               thesis: 'Tesis'
             };
             const formattedArgs = Object.entries(args)
-              .map(([k, v]) => `${LOG_PREFIX.CEO_TRADER} ${ANSI_COLORS.WHITE}${keyTranslations[k] || k}:${ANSI_COLORS.RESET} ${v}`)
+              .map(([k, v]) => {
+                const valStr = typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v);
+                return `${LOG_PREFIX.CEO_TRADER} ${ANSI_COLORS.WHITE}${keyTranslations[k] || k}:${ANSI_COLORS.RESET} ${valStr}`;
+              })
               .join('\n');
             console.log(formattedArgs);
           }
@@ -171,10 +174,11 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           } else if (toolCall.function.name === 'consult_smart_analyst') {
             displayResult = `Informe Estratégico completado y entregado al CEO.`;
           } else if (toolCall.function.name === 'command_scrappy') {
-            try {
-              const args = JSON.parse(toolCall.function.arguments);
-              displayResult = `(Acción: ${args.action}, Motivo: ${args.reason})`;
-            } catch (e) { }
+            if (parsed?.success) {
+              displayResult = `✅ ${parsed.message}`;
+            } else {
+              displayResult = `❌ Error: ${parsed?.error || 'Error de configuración'}`;
+            }
           } else if (toolCall.function.name === 'close_position') {
             if (parsed?.error) {
               displayResult = `❌ Error: ${parsed.error}`;

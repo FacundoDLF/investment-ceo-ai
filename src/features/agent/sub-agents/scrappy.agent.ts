@@ -24,6 +24,14 @@ export async function runScrappyIteration() {
   if (!config.active) return; // Apagado
 
   try {
+    // 🛡️ REVISIÓN PROACTIVA DE ALCANCÍA (Por si el CEO bajó la meta abruptamente)
+    const currentPnL = await MissionService.getScrappyPnL();
+    if (currentPnL >= config.target && config.target > 0) {
+      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 [Scrappy] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada pasivamente (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
+      await MissionService.resetScrappyPnL();
+      await MissionService.setScrappyReport(`¡SPRINT COMPLETADO! Se re-evaluó la alcancía y superó la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0. Sigo operando con normalidad.`);
+    }
+
     const symbol = config.targetAsset;
     const priceData = await getMarketPrice('bybit', symbol);
     const midPrice = (priceData.bid + priceData.ask) / 2;
@@ -146,7 +154,7 @@ Reglas Críticas:
             if (myPosition) {
               console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${myPosition.side?.toUpperCase()}):`);
               console.log(`${ANSI_COLORS.GRAY}  ├─ Entrada : $${myPosition.avgEntryPrice}${ANSI_COLORS.RESET}`);
-              console.log(`${ANSI_COLORS.GRAY}  ├─ Actual  : $${priceData.bid.toFixed(2)}${ANSI_COLORS.RESET}`);
+              console.log(`${ANSI_COLORS.GRAY}  ├─ Actual  : $${priceData.bid.toFixed(6)}${ANSI_COLORS.RESET}`);
               console.log(`${ANSI_COLORS.GRAY}  └─ Var %     : ${pnlPct >= 0 ? ANSI_COLORS.GREEN + '+' : ANSI_COLORS.RED}${pnlPct.toFixed(3)}%${ANSI_COLORS.RESET}`);
             } else {
               console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}%)`);

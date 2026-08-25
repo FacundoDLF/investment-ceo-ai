@@ -1,8 +1,8 @@
 {
-  "timestamp": "2026-08-25T02:23:17.090Z",
-  "uid": "groq::openai/gpt-oss-20b",
-  "model": "openai/gpt-oss-20b",
+  "timestamp": "2026-08-25T15:14:58.251Z",
+  "uid": "groq::openai/gpt-oss-120b",
+  "model": "openai/gpt-oss-120b",
   "provider": "groq",
-  "status": 400,
-  "error": "400 {\"error\":{\"message\":\"Parsing failed. The model generated output that could not be parsed. Please adjust your prompt. See 'failed_generation' for more details.\",\"type\":\"invalid_request_error\",\"code\":\"output_parse_failed\",\"failed_generation\":\"We are ChatGPT playing role Scrappy. The current state: open BUY position at 79621.8. PnL Flotante: 1.332% (positive). According to rules: if PnL >= +0.80% and market losing strength, close; if market strong impulse, activate trailing. Need to decide. Market conditions? Current price: BID 80681.4. We bought at 79621.8, now price has increased significantly. We have 1.332% profit. Market appears to be moving upward, so strong impulse. So we should activate trailing with distance=0.20. So we invoke scalp_action with action: \\\"ACTIVATE_TRAILING\\\" distance 0.20.\"}}"
+  "status": 502,
+  "error": "502 <html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n"
 }

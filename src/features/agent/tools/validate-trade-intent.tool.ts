@@ -6,7 +6,7 @@ export const validateTradeIntentSchema = z.object({
   symbol: z.string().describe('Símbolo del activo (ej. BTCUSDT)'),
   side: z.enum(['buy', 'sell']).describe('Dirección de la orden planificada'),
   qty: z.coerce.number().positive().describe('Cantidad planificada'),
-  category: z.enum(['spot', 'linear']).optional().describe('Categoría del mercado'),
+  category: z.enum(['spot', 'linear']).describe('Categoría del mercado (spot o linear)'),
 });
 
 export const validateTradeIntentTool = {
@@ -23,7 +23,7 @@ export const validateTradeIntentTool = {
         qty: { type: 'number' },
         category: { type: 'string', enum: ['spot', 'linear'] },
       },
-      required: ['venue', 'symbol', 'side', 'qty'],
+      required: ['venue', 'symbol', 'side', 'qty', 'category'],
     },
   },
 };

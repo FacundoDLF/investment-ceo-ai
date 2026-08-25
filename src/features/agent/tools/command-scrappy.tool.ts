@@ -2,11 +2,13 @@ import { z } from 'zod';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { StateService } from '../services/state.service';
 import { getUnifiedBalance } from '@/features/venues/venue.service';
+import { MissionService } from '../services/mission.service';
 
 export const commandScrappySchema = z.object({
   action: z.enum(['START', 'STOP', 'UPDATE']).describe('Acción a tomar sobre Scrappy'),
   asset: z.string().optional().describe('Símbolo del activo a operar (ej. BTCUSDT)'),
-  baseCapital: z.coerce.number().optional().describe('Base Imponible en USDT sobre la que se calculará el presupuesto y la meta (ej. 1000)'),
+  baseCapital: z.coerce.number().optional().describe('Base Imponible sobre la que se calculará el Budget final (ej. si pasas 5000, el Budget real será el 20%: 1000)'),
+  resetPnL: z.enum(['true', 'false']).optional().describe('Texto plano "true" o "false". Si es "true", reinicia la alcancía (PnL) a 0. Úsalo OBLIGATORIAMENTE al bajar la Base Imponible.'),
   budgetMultiplier: z.coerce.number().optional().describe('Multiplicador porcentual para el presupuesto (defecto: 0.2, es decir 20% cada $1000 de Base)'),
   targetMultiplier: z.coerce.number().optional().describe('Multiplicador porcentual para la meta (defecto: 0.1, es decir 10% del presupuesto)'),
   directive: z.string().optional().describe('Instrucción táctica o GRITO URGENTE del CEO para forzar a Scrappy a actuar (ej. "¡ESTÁS EN CAÍDA, HAZ DCA AHORA MISMO!" o "¡CIERRA INMEDIATAMENTE!").'),
@@ -27,6 +29,7 @@ export const commandScrappyTool: ChatCompletionTool = {
         budgetMultiplier: { type: 'number' },
         targetMultiplier: { type: 'number' },
         directive: { type: 'string' },
+        resetPnL: { type: 'string', enum: ['true', 'false'] },
         reason: { type: 'string' }
       },
       required: ['action', 'reason'],
@@ -43,7 +46,7 @@ export async function executeCommandScrappy(args: string): Promise<any> {
       return JSON.stringify({ error: "Validation Error", details: result.error.issues });
     }
     
-    const { action, asset, baseCapital, budgetMultiplier, targetMultiplier, directive } = result.data;
+    const { action, asset, baseCapital, budgetMultiplier, targetMultiplier, directive, resetPnL } = result.data;
 
     let active = StateService.getScrappyState().active;
     if (action === 'START') active = true;
@@ -79,9 +82,18 @@ export async function executeCommandScrappy(args: string): Promise<any> {
       StateService.setScrappyDirective(directive);
     }
 
+    let pnlStatus = "";
+    if (resetPnL === 'true') {
+      await MissionService.resetScrappyPnL();
+      pnlStatus = " -> Alcancía: $0.00";
+    } else {
+      const currentPnL = await MissionService.getScrappyPnL();
+      pnlStatus = ` -> Alcancía retenida: $${currentPnL.toFixed(2)}`;
+    }
+
     return JSON.stringify({
       success: true,
-      message: `Scrappy configurado. Estado: ${active ? 'ACTIVO' : 'APAGADO'}${asset ? `, Activo: ${asset.toUpperCase()}` : ''}${baseCapital ? `, Base Imponible: $${baseCapital}` : ''}${budget ? ` -> Budget Auto-calculado: $${budget.toFixed(2)}` : ''}${target ? ` -> Target Auto-calculado: $${target.toFixed(2)}` : ''}${directive ? ` -> Directiva enviada: "${directive}"` : ''}`
+      message: `Scrappy configurado. Estado: ${active ? 'ACTIVO' : 'APAGADO'}${asset ? `, Activo: ${asset.toUpperCase()}` : ''}${baseCapital ? `, Base Imponible: $${baseCapital}` : ''}${budget ? ` -> Budget Auto-calculado: $${budget.toFixed(2)}` : ''}${target ? ` -> Target Auto-calculado: $${target.toFixed(2)}` : ''}${directive ? ` -> Directiva enviada: "${directive}"` : ''}${pnlStatus}`
     });
 
   } catch (error: any) {

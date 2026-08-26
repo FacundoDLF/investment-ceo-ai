@@ -73,6 +73,30 @@ export async function executeCommandScrappy(args: string): Promise<any> {
         // Ignorar si falla la API
       }
 
+      // PRE-FLIGHT CHECK: Validación de tamaño mínimo de orden
+      if (budget > 0 && asset) {
+        try {
+          const { getMarketPrice, getInstrumentInfo } = await import('@/features/venues/venue.service');
+          const priceData = await getMarketPrice('bybit', asset);
+          const currentPrice = priceData.ask;
+          let qty = budget / currentPrice;
+          
+          const info = await getInstrumentInfo('bybit', asset);
+          const precision = info.qtyStep.toString().split('.')[1]?.length || 0;
+          qty = Number((Math.floor(qty / info.qtyStep) * info.qtyStep).toFixed(precision));
+          
+          const orderValue = qty * currentPrice;
+          if (qty <= 0 || orderValue < 5) {
+            return JSON.stringify({
+              error: "Pre-flight Check Failed: Insufficient Budget",
+              message: `El presupuesto de $${budget.toFixed(2)} es insuficiente para operar ${asset.toUpperCase()} debido al valor mínimo del exchange (Min Value: 5 USDT, valor actual calculado: $${orderValue.toFixed(2)}). Debes elegir una moneda más barata o incrementar el capital.`
+            });
+          }
+        } catch (e: any) {
+          console.warn(`[Scrappy Pre-flight] Error validando instrumento: ${e.message}`);
+        }
+      }
+
       target = budget * tMult;
     }
 

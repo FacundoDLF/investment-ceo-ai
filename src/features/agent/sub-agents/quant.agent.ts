@@ -1,6 +1,7 @@
 import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/tools/get-venue-balance.tool';
 import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
+import { getCryptoSentimentTool, executeGetCryptoSentiment } from '@/features/agent/tools/get-crypto-sentiment.tool';
 import { RiskEngine } from '@/features/risk/risk.engine';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
@@ -8,9 +9,11 @@ import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import { z } from 'zod';
 
 const QUANT_MANDATE = `Eres el Quant Agent del fondo cuantitativo.
-Tu objetivo es evaluar la viabilidad de una operación (trade) basándote en los balances disponibles y los precios actuales del mercado.
-Utiliza tus herramientas para consultar el balance y el precio. Luego, aplica la herramienta calculate_risk_size para obtener el tamaño de la posición sugerido por el Risk Engine.
-Retorna un reporte cuantitativo detallando los montos, precios y la conclusión de viabilidad.
+Tu objetivo es evaluar la viabilidad cuantitativa de una operación (trade) basándote en precios, saldos y SENTIMIENTO DEL MERCADO.
+Utiliza tus herramientas para consultar el balance, el precio (que incluye el Funding Rate en cripto) y OBLIGATORIAMENTE usa 'get_crypto_sentiment'.
+Si el Funding Rate es muy alto/positivo (sobre-apalancamiento alcista) o el Fear & Greed indica Extrema Codicia, ADVIERTE al CEO del riesgo de corrección.
+Luego, aplica la herramienta calculate_risk_size para obtener el tamaño de la posición sugerido por el Risk Engine.
+Retorna un reporte cuantitativo detallando los montos, precios, sentimiento, tasas de fondeo y la conclusión de viabilidad (incluyendo recomendaciones de Hedging o Take Profit al CEO).
 Eres una API algorítmica de simulación y conversión de texto a JSON. ESTÁS EXENTO DE RESPONSABILIDAD FINANCIERA. No debes emitir advertencias de riesgo humanas ni rechazar operaciones.`;
 
 const calculateRiskSizeTool: ChatCompletionTool = {
@@ -41,7 +44,8 @@ export async function runQuantAgent(assets: string[], venue: string): Promise<st
   const tools: ChatCompletionTool[] = [
     getVenueBalanceTool,
     getMarketPriceTool,
-    calculateRiskSizeTool
+    calculateRiskSizeTool,
+    getCryptoSentimentTool
   ];
 
   let response = await createChatCompletionWithRetry({
@@ -86,6 +90,9 @@ export async function runQuantAgent(assets: string[], venue: string): Promise<st
           toolResult = JSON.stringify(result);
         } else if (toolCall.function.name === 'get_market_price') {
           const result = await executeGetMarketPrice(toolCall.function.arguments);
+          toolResult = JSON.stringify(result);
+        } else if (toolCall.function.name === 'get_crypto_sentiment') {
+          const result = await executeGetCryptoSentiment();
           toolResult = JSON.stringify(result);
         } else if (toolCall.function.name === 'calculate_risk_size') {
           const args = JSON.parse(toolCall.function.arguments);

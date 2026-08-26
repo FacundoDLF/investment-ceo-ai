@@ -209,7 +209,7 @@ export class BybitAdapter implements IVenueAdapter {
     return json.result;
   }
 
-  async getMarketPrice(symbol: string): Promise<{ bid: number; ask: number }> {
+  async getMarketPrice(symbol: string): Promise<{ bid: number; ask: number; fundingRate?: number }> {
     const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
     const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
 
@@ -234,6 +234,7 @@ export class BybitAdapter implements IVenueAdapter {
     return {
       bid: parseFloat(ticker.bid1Price || ticker.lastPrice || '0'),
       ask: parseFloat(ticker.ask1Price || ticker.lastPrice || '0'),
+      fundingRate: ticker.fundingRate ? parseFloat(ticker.fundingRate) : undefined,
     };
   }
 

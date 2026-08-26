@@ -155,17 +155,13 @@ async function runDaemonIteration(mode?: string) {
 
       // Dynamic logging of spot coins
       if (balance.coins && balance.coins.length > 0) {
-        const currentCoinsHash = JSON.stringify(balance.coins);
-        if (currentCoinsHash !== lastLoggedCoinsHash) {
-          lastLoggedCoinsHash = currentCoinsHash;
-          console.log(`${ANSI_COLORS.CYAN}  🪙 PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
-          balance.coins.forEach((c, index) => {
-            const isLast = index === balance.coins!.length - 1;
-            const prefix = isLast ? '└─' : '├─';
-            const usdVal = c.usdValue !== undefined ? ` (~$${c.usdValue.toFixed(2)})` : '';
-            console.log(`${ANSI_COLORS.GRAY}  ${prefix} ${c.symbol.padEnd(6)}: ${ANSI_COLORS.GREEN}${c.balance}${ANSI_COLORS.GRAY}${usdVal}${ANSI_COLORS.RESET}`);
-          });
-        }
+        console.log(`${ANSI_COLORS.CYAN}  🪙 PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
+        balance.coins.forEach((c, index) => {
+          const isLast = index === balance.coins!.length - 1;
+          const prefix = isLast ? '└─' : '├─';
+          const usdVal = c.usdValue !== undefined ? ` (~$${c.usdValue.toFixed(2)})` : '';
+          console.log(`${ANSI_COLORS.GRAY}  ${prefix} ${c.symbol.padEnd(6)}: ${ANSI_COLORS.GREEN}${c.balance}${ANSI_COLORS.GRAY}${usdVal}${ANSI_COLORS.RESET}`);
+        });
       }
       console.log('');
 

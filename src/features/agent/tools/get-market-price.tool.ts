@@ -41,6 +41,7 @@ export async function executeGetMarketPrice(argsString: string): Promise<any> {
       symbol: args.symbol,
       bid: price.bid,
       ask: price.ask,
+      fundingRate: price.fundingRate,
       timestamp: new Date().toISOString(),
     };
   } catch (error: any) {

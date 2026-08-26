@@ -19,7 +19,7 @@ export async function getUnifiedBalance(venueName: VenueName): Promise<BalanceBr
   return await adapter.getAvailableBalance();
 }
 
-export async function getMarketPrice(venueName: VenueName, symbol: string): Promise<{ bid: number; ask: number }> {
+export async function getMarketPrice(venueName: VenueName, symbol: string): Promise<{ bid: number; ask: number; fundingRate?: number }> {
   const adapter = venueRegistry[venueName];
   
   if (!adapter) {

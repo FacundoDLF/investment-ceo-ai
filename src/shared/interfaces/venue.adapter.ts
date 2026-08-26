@@ -56,10 +56,10 @@ export interface IVenueAdapter {
   getAvailableBalance(): Promise<BalanceBreakdown>;
 
   /**
-   * Obtiene el precio actual (Bid/Ask) del mercado para un instrumento.
+   * Obtiene el precio actual (Bid/Ask) y métricas (Funding Rate) del mercado para un instrumento.
    * @param symbol Símbolo del activo (ej. 'AAPL', 'BTCUSDT').
    */
-  getMarketPrice(symbol: string): Promise<{ bid: number; ask: number }>;
+  getMarketPrice(symbol: string): Promise<{ bid: number; ask: number; fundingRate?: number }>;
 
   /**
    * Obtiene la información del instrumento (tamaño de lote, decimales permitidos, etc).

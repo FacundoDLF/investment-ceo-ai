@@ -272,7 +272,15 @@ async function executeScalpAction(
         }
       }
 
-      if (qty <= 0) return;
+      const orderValue = qty * currentPrice;
+      if (qty <= 0 || orderValue < 5) {
+        const now = Date.now();
+        if (now - lastHeartbeatTime > 30000) {
+          console.log(`${ANSI_COLORS.RED}❌ [Scrappy] Presupuesto insuficiente ($${config.budget.toFixed(2)}). El valor de la orden ($${orderValue.toFixed(2)}) no cumple con el mínimo de 5 USDT en Bybit para ${symbol}.${ANSI_COLORS.RESET}`);
+          lastHeartbeatTime = now;
+        }
+        return;
+      }
 
       const side = action === 'OPEN_LONG' ? 'buy' : 'sell';
       const sideStr = action === 'OPEN_LONG' ? 'LONG' : 'SHORT';

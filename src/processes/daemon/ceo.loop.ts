@@ -472,10 +472,21 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
  | |___| |___| |_| |   /  __  \\  | | 
  |_____|_____|_____|  /__/  \\__\\|___|
 
-  \x1b[0m
-  ${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}Investment CEO AI(Modo: ${mode || 'Normal'}) ${ANSI_COLORS.RESET}\n`;
+  \x1b[0m`;
 
-  console.log(asciiBrain);
+  const modeTitle = mode === 'crypto' 
+    ? `${ANSI_COLORS.MAGENTA}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: CRYPTO DEGEN) ${ANSI_COLORS.RESET}\n\n` +
+      `────────────────────────────────────────────────────────────────────────\n` +
+      `  🚀 CONFIGURACIÓN DE MODO CRYPTO\n` +
+      `────────────────────────────────────────────────────────────────────────\n` +
+      `  Broker Activo    : Bybit (Alpaca Ignorado)\n` +
+      `  Escáner          : Markus Skinner (Activo cada 15m)\n` +
+      `  Frecuencia       : Aceleración dinámica activada\n` +
+      `────────────────────────────────────────────────────────────────────────\n`
+    : `${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: Normal) ${ANSI_COLORS.RESET}\n`;
+
+  const finalAscii = asciiBrain + modeTitle;
+  console.log(finalAscii);
   ModelRouter.printRegistryTable();
 
   while (true) {

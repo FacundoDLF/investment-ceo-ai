@@ -6,16 +6,19 @@ import { ANSI_COLORS } from '@/shared/constants/colors';
 StateService.setScrappyConfig(true, 'BTCUSDT', 200, 20);
 
 const scrappyAscii = `${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}
-         _
-       _|_|_
-      |     |
-      |     |
-   _  |     |  _
-  | | |     | | |
-  | | |     | | |
-  \\_| |     | |_/
-      |     |
-      |_____|
+                                                       _____
+                                                     /'     \`\\
+  __                                            ___/'         \`\\
+/'  \`\\_                          _            /'                \\
+       \\________________________( )_________/'                   \`\\_______
+                             _  | |                _
+          _                 ( \\ |  )  _           ( ) _
+       _ ( )                 \\ \`|  | ( )         _| |/ )
+      ( \\| | _                \`\\,  |/'/'        ( \\  /'
+       \\,. |/ )                 |   /'           \\  |
+         |  /'                  |  |              | |
+         | |                                      | |
+                                               by Blac...@wsb.freinet.de
 
 ${ANSI_COLORS.PINK}  ____  ____ ____      _    ____  ____ __   __
  / ___|/ ___|  _ \\    / \\  |  _ \\|  _ \\\\ \\ / /

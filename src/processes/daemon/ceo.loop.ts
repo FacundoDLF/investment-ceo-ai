@@ -69,19 +69,19 @@ async function runDaemonIteration(mode?: string) {
     for (const v of [VENUES.ALPACA, VENUES.BYBIT]) {
       const challenge = await MissionService.getActiveChallenge(v);
       if (challenge && challenge.targetMetric > 0) {
-        console.log(`${ANSI_COLORS.CYAN}🎯 Desafío CEO (${v.toUpperCase()}): Tier ${challenge.tier} | Meta: $${challenge.targetMetric.toFixed(2)}${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.CYAN}Desafío CEO (${v.toUpperCase()}): Tier ${challenge.tier} | Meta: $${challenge.targetMetric.toFixed(2)}${ANSI_COLORS.RESET}`);
       }
     }
     const scrappyState = StateService.getScrappyState();
     if (scrappyState.active) {
       const currentScrappyPnL = await MissionService.getScrappyPnL();
-      console.log(`${ANSI_COLORS.MAGENTA}🎯 Desafío Scrappy: Meta $${scrappyState.target} | PnL Actual: $${currentScrappyPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.MAGENTA}Desafío Scrappy: Meta $${scrappyState.target} | PnL Actual: $${currentScrappyPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
     }
 
     const octavioState = StateService.getOctavioState();
     if (octavioState.active) {
       const currentOctavioPnL = await MissionService.getOctavioPnL();
-      console.log(`${ANSI_COLORS.CYAN}🎯 Desafío Octavio: Meta $${octavioState.target} | PnL Actual: $${currentOctavioPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.CYAN}Desafío Octavio: Meta $${octavioState.target} | PnL Actual: $${currentOctavioPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
     }
 
     const activeVenues: VenueName[] = mode === TRADING_MODES.CRYPTO ? [VENUES.BYBIT] : [VENUES.ALPACA, VENUES.BYBIT];
@@ -109,7 +109,7 @@ async function runDaemonIteration(mode?: string) {
 
     for (const venue of activeVenues) {
       if (frozenVenues.has(venue)) {
-        console.log(`\n${LOG_PREFIX.SISTEMA} 🧊 OMITIENDO ${venue.toUpperCase()}: El broker se encuentra CONGELADO por Circuit Breaker.`);
+        console.log(`\n${LOG_PREFIX.SISTEMA} OMITIENDO ${venue.toUpperCase()}: El broker se encuentra CONGELADO por Circuit Breaker.`);
         continue;
       }
       console.log(`\n${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}========== [ EVALUANDO CARTERA: ${venue.toUpperCase()} ] ==========${ANSI_COLORS.RESET}`);
@@ -142,7 +142,7 @@ async function runDaemonIteration(mode?: string) {
             const pnl = closedInfo ? closedInfo.closedPnl : 0;
             const msgColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
             const sign = pnl >= 0 ? '+' : '';
-            console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}🛎️ Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
+            console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
           }
         }
       }
@@ -154,7 +154,7 @@ async function runDaemonIteration(mode?: string) {
       const pnlPercentage = balance.cash > 0 ? totalUnrealizedPnL / balance.cash : 0;
 
       const pnlColor = totalUnrealizedPnL >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
-      console.log(`${ANSI_COLORS.CYAN}  💰 ESTADO DE BILLETERA (${venue.toUpperCase()})${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.CYAN}  ESTADO DE BILLETERA (${venue.toUpperCase()})${ANSI_COLORS.RESET}`);
       console.log(`${ANSI_COLORS.GRAY}  ├─ Total Equity    : ${ANSI_COLORS.GREEN}$${balance.cash.toFixed(2)}${ANSI_COLORS.RESET}`);
       console.log(`${ANSI_COLORS.GRAY}  ├─ Margin Balance  : ${ANSI_COLORS.GREEN}$${futures.toFixed(2)}${ANSI_COLORS.RESET}`);
       console.log(`${ANSI_COLORS.GRAY}  ├─ Spot (Liquidez) : ${ANSI_COLORS.GREEN}$${spot.toFixed(2)}${ANSI_COLORS.RESET}`);
@@ -162,7 +162,7 @@ async function runDaemonIteration(mode?: string) {
 
       // Dynamic logging of spot coins
       if (balance.coins && balance.coins.length > 0) {
-        console.log(`${ANSI_COLORS.CYAN}  🪙 PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.CYAN}  PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
         balance.coins.forEach((c, index) => {
           const isLast = index === balance.coins!.length - 1;
           const prefix = isLast ? '└─' : '├─';
@@ -174,7 +174,7 @@ async function runDaemonIteration(mode?: string) {
 
       // EMERGENCY CIRCUIT BREAKER (-25%)
       if (pnlPercentage <= -0.25) {
-        console.log(`\n${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨🚨 ALERTA ROJA NUCLEAR: EMERGENCY LIQUIDATION (-25% PATRIMONIO) 🚨🚨${ANSI_COLORS.RESET}`);
+        console.log(`\n${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}⚠️⚠️ ALERTA ROJA NUCLEAR: EMERGENCY LIQUIDATION (-25% PATRIMONIO) ⚠️⚠️${ANSI_COLORS.RESET}`);
         console.log(`${ANSI_COLORS.RED}Ejecutando Botón de Pánico: Apagando agentes y liquidando todo a Market.${ANSI_COLORS.RESET}`);
 
         StateService.setScrappyConfig(false);
@@ -211,7 +211,7 @@ async function runDaemonIteration(mode?: string) {
           }
         }
 
-        console.log(`${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}🚨 LIQUIDACIÓN COMPLETADA EN ${venue.toUpperCase()}. EL BROKER SE CONGELARÁ (FROZEN) POR SEGURIDAD. 🚨${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}⚠️ LIQUIDACIÓN COMPLETADA EN ${venue.toUpperCase()}. EL BROKER SE CONGELARÁ (FROZEN) POR SEGURIDAD. ⚠️${ANSI_COLORS.RESET}`);
         frozenVenues.add(venue);
         continue;
       }
@@ -237,7 +237,7 @@ async function runDaemonIteration(mode?: string) {
       } else if (iterationCount === 1 || iterationCount % 5 === 0) {
         currentState = 'PORTFOLIO_AUDIT';
         marketContext = MARKET_STATES.PORTFOLIO_AUDIT;
-        console.log(`${LOG_PREFIX.SISTEMA} 🔍 Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.SISTEMA} Iniciando AUDITORÍA DE PORTAFOLIO (Iteración #${iterationCount})${ANSI_COLORS.RESET}`);
       } else if (mode === TRADING_MODES.CRYPTO) {
         currentState = 'CRYPTO_ALWAYS_OPEN';
         marketContext = MARKET_STATES.CRYPTO_ALWAYS_OPEN;
@@ -278,7 +278,7 @@ async function runDaemonIteration(mode?: string) {
       marketContext += `- Poder Futuros (Garantía): ${futures.toFixed(2)}\n`;
 
       if (activeChallenge) {
-        marketContext = `**[ MISIÓN ACTUAL DE LA BÓVEDA (${venue.toUpperCase()}) ]**\n🎯 ${activeChallenge.title}\n📜 ${activeChallenge.description}\n📈 Meta de Patrimonio Total: ${activeChallenge.targetMetric}\n💰 Patrimonio Total Actual: ${balance.cash.toFixed(2)}\n\n` + marketContext;
+        marketContext = `**[ MISIÓN ACTUAL DE LA BÓVEDA (${venue.toUpperCase()}) ]**\n${activeChallenge.title}\n${activeChallenge.description}\nMeta de Patrimonio Total: ${activeChallenge.targetMetric}\nPatrimonio Total Actual: ${balance.cash.toFixed(2)}\n\n` + marketContext;
       }
       if (!hasCapital) {
         marketContext += `\n⚠️ **ATENCIÓN: CAPITAL INSUFICIENTE.** No tienes saldo disponible para abrir nuevas posiciones. Tu prioridad absoluta debe ser decidir si esperas o si cierras posiciones activas para liberar capital. No intentes analizar nuevas compras.\n`;
@@ -293,7 +293,7 @@ async function runDaemonIteration(mode?: string) {
         }
 
         if (scrappyInactiveIterations >= 3) {
-          marketContext += `\n🚨 **ALERTA CRÍTICA:** Scrappy ha estado inactivo por ${scrappyInactiveIterations} iteraciones. ¡DESPIÉRTALO AHORA! Es OBLIGATORIO que uses 'command_scrappy' en esta respuesta para asignarle una Misión Fetch (Presupuesto y Meta), incluso si lo haces investigar BTCUSDT u otra moneda.\n`;
+          marketContext += `\n⚠️ **ALERTA CRÍTICA:** Scrappy ha estado inactivo por ${scrappyInactiveIterations} iteraciones. ¡DESPIÉRTALO AHORA! Es OBLIGATORIO que uses 'command_scrappy' en esta respuesta para asignarle una Misión Fetch (Presupuesto y Meta), incluso si lo haces investigar BTCUSDT u otra moneda.\n`;
         }
 
         const octavioConfig = StateService.getOctavioState();
@@ -404,12 +404,12 @@ async function runDaemonIteration(mode?: string) {
 
         await MissionService.setCurrentTarget(venue, initialTarget);
         activeChallenge.targetMetric = initialTarget;
-        console.log(`\n${ANSI_COLORS.CYAN}🎯 Hito autogenerado para ${venue.toUpperCase()}: Meta Efectiva inicial fijada en $${initialTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
+        console.log(`\n${ANSI_COLORS.CYAN}Hito autogenerado para ${venue.toUpperCase()}: Meta Efectiva inicial fijada en $${initialTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
       }
 
       // Evaluar Victoria sobre el PATRIMONIO EFECTIVO
       if (activeChallenge && activeChallenge.targetMetric > 0 && effectiveEquity >= activeChallenge.targetMetric) {
-        console.log(`\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 ¡HITO LOGRADO EN ${venue.toUpperCase()}! 🎉${ANSI_COLORS.RESET}`);
+        console.log(`\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ ¡HITO LOGRADO EN ${venue.toUpperCase()}! ✅${ANSI_COLORS.RESET}`);
         console.log(`${ANSI_COLORS.GREEN}Meta Efectiva alcanzada: $${effectiveEquity.toFixed(2)} / $${activeChallenge.targetMetric.toFixed(2)}${ANSI_COLORS.RESET}`);
 
         const newFrozen = frozenReserve + MissionService.SALARY_RESERVE;
@@ -486,7 +486,7 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
     ? `${asciiCrypto}\n` +
       `  Investment CEO AI (Modo: CRYPTO DEGEN) \n\n` +
       `────────────────────────────────────────────────────────────────────────\n` +
-      `  🚀 CONFIGURACIÓN DE MODO CRYPTO\n` +
+      `  CONFIGURACIÓN DE MODO CRYPTO\n` +
       `────────────────────────────────────────────────────────────────────────\n` +
       `  Mercado Tradicional (Alpaca) : 🔴 CERRADO / IGNORADO\n` +
       `  Mercado Crypto (Bybit)       : 🟢 24/7 ABIERTO\n` +
@@ -525,11 +525,11 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
     // Si está activo, no hace falta aclarar porque Scrappy floodea la consola con sus radares.
     const scrappyState = StateService.getScrappyState();
     if (!scrappyState.active) {
-      console.log(`${LOG_PREFIX.SCRAPPY} 💤 Mantenimiento en progreso (APAGADO). A la espera de directivas del CEO.\n`);
+      console.log(`${LOG_PREFIX.SCRAPPY} Mantenimiento en progreso (APAGADO). A la espera de directivas del CEO.\n`);
     }
     const octavioStateLocal = StateService.getOctavioState();
     if (!octavioStateLocal.active) {
-      console.log(`${ANSI_COLORS.CYAN}🐙 [Octavio] 💤 Mantenimiento en progreso (APAGADO). Esperando activación del CEO.\n${ANSI_COLORS.RESET}`);
+      console.log(`${LOG_PREFIX.OCTAVIO} Mantenimiento en progreso (APAGADO). Esperando activación del CEO.\n`);
     }
     await new Promise(resolve => setTimeout(resolve, currentInterval * 1000));
   }

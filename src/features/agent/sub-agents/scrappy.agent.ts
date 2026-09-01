@@ -27,7 +27,7 @@ export async function runScrappyIteration() {
     // 🛡️ REVISIÓN PROACTIVA DE ALCANCÍA (Por si el CEO bajó la meta abruptamente)
     const currentPnL = await MissionService.getScrappyPnL();
     if (currentPnL >= config.target && config.target > 0) {
-      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 [Scrappy] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada pasivamente (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Scrappy] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada pasivamente (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
       await MissionService.resetScrappyPnL();
       await MissionService.setScrappyReport(`¡SPRINT COMPLETADO! Se re-evaluó la alcancía y superó la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0. Sigo operando con normalidad.`);
     }
@@ -72,7 +72,7 @@ export async function runScrappyIteration() {
           console.log(`${ANSI_COLORS.RED}🔴 [Scrappy Radar] Drawdown profundo detectado (${pnlPct.toFixed(2)}%). Acercándose a zona DCA (-1.50%)...${ANSI_COLORS.RESET}`);
           lastLogTime = now;
         } else if (Math.abs(pnlPct) >= 1.50) {
-          console.log(`${ANSI_COLORS.MAGENTA}[Scrappy] 🚨 RENTABILIDAD CRÍTICA DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}${ANSI_COLORS.RESET}`);
+          console.log(`${ANSI_COLORS.PINK}[Scrappy] ⚠️ RENTABILIDAD CRÍTICA DETECTADA: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% en ${symbol}${ANSI_COLORS.RESET}`);
           lastLogTime = now;
         }
       }
@@ -86,8 +86,8 @@ export async function runScrappyIteration() {
     let directiveText = "";
     const ceoDirective = StateService.getScrappyDirective();
     if (ceoDirective) {
-      console.log(`${ANSI_COLORS.YELLOW}⚡ [Scrappy] ¡Grito del CEO recibido ("${ceoDirective}")! Inyectando orden de emergencia en el motor HFT...${ANSI_COLORS.RESET}`);
-      directiveText = `\n\n🚨 [DIRECTIVA URGENTE DEL CEO]: "${ceoDirective}"\n¡DEBES OBEDECER ESTA INSTRUCCIÓN INMEDIATAMENTE EN TU PRÓXIMA ACCIÓN!`;
+      console.log(`${ANSI_COLORS.YELLOW}[Scrappy] ¡Grito del CEO recibido ("${ceoDirective}")! Inyectando orden de emergencia en el motor HFT...${ANSI_COLORS.RESET}`);
+      directiveText = `\n\n⚠️ [DIRECTIVA URGENTE DEL CEO]: "${ceoDirective}"\n¡DEBES OBEDECER ESTA INSTRUCCIÓN INMEDIATAMENTE EN TU PRÓXIMA ACCIÓN!`;
       StateService.setScrappyDirective(null); // Consumir el mensaje
     }
 
@@ -143,7 +143,7 @@ Reglas Críticas:
           trailingActive = true;
           trailingDistance = dist;
           trailingMaxPnl = pnlPct;
-          console.log(`${ANSI_COLORS.CYAN}🚀 [Scrappy] ¡Trailing Stop Activado por la IA! Persiguiendo precio con distancia de ${dist}%.${ANSI_COLORS.RESET}`);
+          console.log(`${ANSI_COLORS.CYAN}[Scrappy] ¡Trailing Stop Activado por la IA! Persiguiendo precio con distancia de ${dist}%.${ANSI_COLORS.RESET}`);
           return;
         }
 
@@ -152,7 +152,7 @@ Reglas Críticas:
           const now = Date.now();
           if (now - lastHeartbeatTime > 30000) {
             if (myPosition) {
-              console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐺 Calculando recorrido del ${symbol} (${myPosition.side?.toUpperCase()}):`);
+              console.log(`${ANSI_COLORS.PINK}[Scrappy]${ANSI_COLORS.RESET} Calculando recorrido del ${symbol} (${myPosition.side?.toUpperCase()}):`);
               console.log(`${ANSI_COLORS.GRAY}  ├─ Entrada : $${myPosition.avgEntryPrice}${ANSI_COLORS.RESET}`);
               console.log(`${ANSI_COLORS.GRAY}  ├─ Actual  : $${priceData.bid.toFixed(6)}${ANSI_COLORS.RESET}`);
               console.log(`${ANSI_COLORS.GRAY}  └─ Var %     : ${pnlPct >= 0 ? ANSI_COLORS.GREEN + '+' : ANSI_COLORS.RED}${pnlPct.toFixed(3)}%${ANSI_COLORS.RESET}`);
@@ -226,14 +226,14 @@ async function executeScalpAction(
       await MissionService.addLifetimeScrappyPnL(realizedPnl);
 
       if (accumulatedPnL >= config.target) {
-        console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 [Scrappy] ¡SPRINT COMPLETADO! Meta de $${config.target} alcanzada (Total: $${accumulatedPnL.toFixed(2)}). Transfiriendo fondos y reiniciando cacería...${ANSI_COLORS.RESET}`);
+        console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Scrappy] ¡SPRINT COMPLETADO! Meta de $${config.target} alcanzada (Total: $${accumulatedPnL.toFixed(2)}). Transfiriendo fondos y reiniciando cacería...${ANSI_COLORS.RESET}`);
         await MissionService.resetScrappyPnL();
         await MissionService.setScrappyReport(`¡SPRINT COMPLETADO! Se alcanzó la meta de $${config.target}. He consolidado $${accumulatedPnL.toFixed(2)} de ganancias en el balance del Exchange y he reiniciado un nuevo sprint con el mismo presupuesto. Sigo operando activamente a la espera de nuevas órdenes si lo deseas.`);
       }
 
       if (Math.abs(pnlPct) >= 0.5) {
         const msgColor = pnlPct > 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.WHITE;
-        console.log(`${LOG_PREFIX.SCRAPPY} ${msgColor}💰 Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% ($${realizedPnl.toFixed(2)})${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.SCRAPPY} ${msgColor}Posición CERRADA en ${symbol}. Rendimiento final: ${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}% ($${realizedPnl.toFixed(2)})${ANSI_COLORS.RESET}`);
         await prisma.executionLog.create({
           data: { eventType: 'SCALP_TRADE_CLOSED', venue: 'bybit', symbol, success: true, details: JSON.stringify({ pnlPct, realizedPnl }) }
         });
@@ -292,7 +292,7 @@ async function executeScalpAction(
         console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 📉 ¡Promediando a la baja (DCA)! Comprando más ${symbol} a $${currentPrice.toFixed(2)} (PnL Actual: ${pnlColor}${sign}${pnlPct.toFixed(2)}%${ANSI_COLORS.RESET})`);
         await cancelAllOrders('bybit', symbol, 'linear').catch(() => { }); // Limpiar TPs antiguos
       } else {
-        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} ⚡ ¡Grrr! Atacó con un ${sideStr} en ${symbol} a $${currentPrice.toFixed(2)} (Entrada Inicial)`);
+        console.log(`${ANSI_COLORS.PINK}[Scrappy]${ANSI_COLORS.RESET} ¡Grrr! Atacó con un ${sideStr} en ${symbol} a $${currentPrice.toFixed(2)} (Entrada Inicial)`);
       }
 
       // 🛡️ HFT: Zero Slippage & Maker Fees. Entramos con Limit Post-Only.

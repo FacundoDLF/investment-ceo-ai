@@ -77,7 +77,7 @@ export class ModelRouter {
 
     const line = `${GR}${'─'.repeat(72)}${R}`;
     console.log(`\n${line}`);
-    console.log(`${B}${C}  🤖 MODELOS DE IA ACTIVOS${R}`);
+    console.log(`${B}${C}  MODELOS DE IA ACTIVOS${R}`);
     console.log(line);
     console.log(`${B}  ${'Rol'.padEnd(15)} ${'Proveedor'.padEnd(12)} ${'Tier'.padEnd(6)} Modelo${R}`);
     console.log(line);

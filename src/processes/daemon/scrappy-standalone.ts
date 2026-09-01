@@ -26,7 +26,7 @@ const config = StateService.getScrappyState();
 
 console.log(scrappyAscii);
 console.log(`${ANSI_COLORS.MAGENTA}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
-console.log(`${ANSI_COLORS.BOLD}  🐺 SCRAPPY HFT (Modo Standalone)${ANSI_COLORS.RESET}`);
+console.log(`${ANSI_COLORS.BOLD}  SCRAPPY HFT (Modo Standalone)${ANSI_COLORS.RESET}`);
 console.log(`${ANSI_COLORS.MAGENTA}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
 console.log(`  Activo Base   : ${config.targetAsset}`);
 console.log(`  Presupuesto   : $${config.budget}`);

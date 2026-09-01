@@ -19,7 +19,7 @@ export async function runOctavioIteration() {
   try {
     const currentPnL = await MissionService.getOctavioPnL();
     if (currentPnL >= config.target && config.target > 0) {
-      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}🎉 [Octavio] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
+      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Octavio] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
       await MissionService.resetOctavioPnL();
       await MissionService.setOctavioReport(`¡SPRINT COMPLETADO! Superé la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0.`);
     }
@@ -42,9 +42,9 @@ export async function runOctavioIteration() {
     const now = Date.now();
     if (now - lastLogTime > 30000) {
       if (myOptionsPositions.length > 0) {
-        console.log(`${ANSI_COLORS.CYAN}🐙 [Octavio] Monitoreando ${myOptionsPositions.length} posiciones de Opciones activas.${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.OCTAVIO} Monitoreando ${myOptionsPositions.length} posiciones de Opciones activas.`);
       } else {
-        console.log(`${ANSI_COLORS.CYAN}🐙 [Octavio] Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length}${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length}`);
       }
       lastLogTime = now;
     }
@@ -52,8 +52,8 @@ export async function runOctavioIteration() {
     let directiveText = "";
     const ceoDirective = StateService.getOctavioDirective();
     if (ceoDirective) {
-      console.log(`${ANSI_COLORS.YELLOW}⚡ [Octavio] ¡Grito del CEO recibido ("${ceoDirective}")!${ANSI_COLORS.RESET}`);
-      directiveText = `\n\n🚨 [DIRECTIVA URGENTE DEL CEO]: "${ceoDirective}"`;
+      console.log(`${ANSI_COLORS.YELLOW}[Octavio] ¡Grito del CEO recibido ("${ceoDirective}")!${ANSI_COLORS.RESET}`);
+      directiveText = `\n\n⚠️ [DIRECTIVA URGENTE DEL CEO]: "${ceoDirective}"`;
       StateService.setOctavioDirective(null);
     }
 
@@ -115,7 +115,7 @@ Reglas Críticas:
         
         if (args.action === 'HOLD') {
            if (now - lastHeartbeatTime > 30000) {
-             console.log(`${ANSI_COLORS.CYAN}🐙 [Octavio] HOLD. Razón: ${args.reason || 'Esperando mejor oportunidad'}${ANSI_COLORS.RESET}`);
+             console.log(`${LOG_PREFIX.OCTAVIO} HOLD. Razón: ${args.reason || 'Esperando mejor oportunidad'}`);
              lastHeartbeatTime = now;
            }
            return;
@@ -123,7 +123,7 @@ Reglas Críticas:
 
         if (now - lastActionTime < 10000) return; // Cooldown 10s
 
-        console.log(`${ANSI_COLORS.CYAN}🐙 [Octavio Action] ${args.action} en ${args.symbol}. Razón: ${args.reason}${ANSI_COLORS.RESET}`);
+        console.log(`${LOG_PREFIX.OCTAVIO} [Acción] ${args.action} en ${args.symbol}. Razón: ${args.reason}`);
 
         try {
           if (args.action === 'OPEN_OPTION') {

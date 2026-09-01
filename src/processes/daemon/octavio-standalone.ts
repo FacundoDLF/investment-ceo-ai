@@ -23,7 +23,7 @@ const config = StateService.getOctavioState();
 
 console.log(octavioAscii);
 console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
-console.log(`${ANSI_COLORS.BOLD}  🐙 OCTAVIO HFT OPTIONS (Modo Standalone)${ANSI_COLORS.RESET}`);
+console.log(`${ANSI_COLORS.BOLD}  OCTAVIO HFT OPTIONS (Modo Standalone)${ANSI_COLORS.RESET}`);
 console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
 console.log(`  Activo Base   : ${config.targetAsset}`);
 console.log(`  Presupuesto   : $${config.budget}`);

@@ -84,3 +84,17 @@ export async function getClosedPositionInfo(venueName: VenueName, symbol: string
   
   return null;
 }
+
+export async function getOptionsChain(venueName: VenueName, baseCoin: string): Promise<any[]> {
+  const adapter = venueRegistry[venueName];
+  
+  if (!adapter) {
+    throw new Error(`Venue no soportado: ${venueName}`);
+  }
+  
+  if (adapter.getOptionsChain) {
+    return await adapter.getOptionsChain(baseCoin);
+  }
+  
+  return [];
+}

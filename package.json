@@ -9,6 +9,7 @@
     "lint": "eslint",
     "ceo": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts --watch",
     "ceo:crypto": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts crypto --watch",
+    "ceo:scrappy": "npx tsx --env-file=.env src/processes/daemon/scrappy-standalone.ts --watch",
     "ceo:octavio": "npx tsx --env-file=.env src/processes/daemon/octavio-standalone.ts --watch",
     "chat": "npx tsx --env-file=.env src/processes/scripts/chat-ceo.ts"
   },

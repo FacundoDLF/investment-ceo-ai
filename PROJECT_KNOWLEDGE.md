@@ -71,6 +71,13 @@
 * **Solución:** En `bybit.adapter.ts` y en `close-position.tool.ts` se implementó explícitamente el uso de la bandera `reduceOnly: true`. Además, la lógica del `positionIdx` en el adapter se invirtió para cierres: al cerrar un Long (vendiendo con reduceOnly), debes enviar `positionIdx = 1`. Al cerrar un Short (comprando con reduceOnly), debes enviar `positionIdx = 2`.
 * **REGLA:** Siempre que diseñes herramientas o adapters para CERRAR posiciones en Hedge Mode, DEBES incluir `reduceOnly: true` en la carga útil y cruzar la orden apuntando al `positionIdx` de la posición original que intentas reducir.
 
+### [ISSUE] Bybit API Error: orderLinkId can not be empty (Opciones)
+
+* **Contexto:** El sub-agente Octavio intentó abrir una posición en un contrato de opciones (`category: 'option'`) en Bybit.
+* **Problema:** La API de Bybit V5 exige que, al enviar órdenes de opciones, el cliente provea explícitamente un `orderLinkId` único, de lo contrario la API rechaza la petición con error.
+* **Solución:** En `bybit.adapter.ts`, dentro del método `executeOrder`, se agregó una validación específica para `category === 'option'`, inyectando un `orderLinkId` dinámico (ej: `'opt_' + Date.now() + '_' + Math.random()`) antes de construir la firma criptográfica y mandar el payload.
+* **REGLA:** NUNCA envíes una orden a la categoría `option` de Bybit sin incluir el parámetro `orderLinkId`.
+
 ### [ISSUE] Bybit API Error: Insufficient balance en Órdenes SPOT
 
 * **Contexto:** El CEO Agent intentaba comprar BTCUSDT enviando una orden `category: "spot"`.

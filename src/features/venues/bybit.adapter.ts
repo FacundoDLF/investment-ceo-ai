@@ -128,6 +128,11 @@ export class BybitAdapter implements IVenueAdapter {
       timeInForce: params.postOnly ? 'PostOnly' : 'GTC',
     };
 
+    // Para opciones, Bybit obliga a mandar un orderLinkId único
+    if (payload.category === 'option') {
+      payload.orderLinkId = 'opt_' + Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString();
+    }
+
     if (params.type === 'limit' && params.limitPrice) {
       payload.price = params.limitPrice.toString();
     }

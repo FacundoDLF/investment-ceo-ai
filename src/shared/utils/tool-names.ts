@@ -9,6 +9,7 @@ export const TOOL_NAMES_ES: Record<string, string> = {
   switch_monitored_asset: "Estoy aburrido! Cambiando el foco...",
   command_scrappy: "Solicitando a Scrappy.",
   command_octavio: "Despertando a Octavio (Opciones).",
+  get_options_chain: "Buscando cadena de opciones disponibles...",
   serper_search: "Actualizando noticias y novedades...",
   tavily_research: "Iniciando investigación profunda...",
   calculate_risk_size: "Calculando Tamaño de Riesgo (Kelly Criterion)"

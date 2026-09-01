@@ -12,7 +12,12 @@ export const executeTradeSchema = z.object({
   limitPrice: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio límite (requerido si type es limit)'),
   stopLoss: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio de Stop Loss para orden OCO'),
   takeProfit: z.preprocess((val) => (val === 'None' || val === null || val === '') ? undefined : val, z.coerce.number().positive().optional()).describe('Precio de Take Profit para orden OCO'),
-  category: z.enum(['spot', 'linear']).optional().describe('Categoría de mercado (spot o linear/futuros). Por defecto linear.'),
+  category: z.enum(['spot', 'linear', 'option']).optional().describe('Categoría de mercado (spot, linear/futuros, u option). Por defecto linear.'),
+  legs: z.array(z.object({
+    symbol: z.string(),
+    ratio_qty: z.number().positive(),
+    side: z.enum(['buy', 'sell'])
+  })).optional().describe('Piernas adicionales para órdenes Multi-Leg en Alpaca (Opciones).'),
   strategy: z.enum(['LONG_TERM', 'INTRADAY']).describe('Estrategia de la operación'),
   thesis: z.string().min(15, "La tesis es obligatoria y debe tener al menos 15 caracteres descriptivos").max(300).describe('Breve tesis de inversión justificando este trade (Obligatorio para la auditoría de portafolio)'),
 });
@@ -33,7 +38,19 @@ export const executeTradeTool = {
         limitPrice: { type: ['number', 'null', 'string'] },
         stopLoss: { type: ['number', 'null', 'string'] },
         takeProfit: { type: ['number', 'null', 'string'] },
-        category: { type: 'string', enum: ['spot', 'linear'] },
+        category: { type: 'string', enum: ['spot', 'linear', 'option'] },
+        legs: { 
+          type: 'array', 
+          items: { 
+            type: 'object', 
+            properties: { 
+              symbol: { type: 'string' }, 
+              ratio_qty: { type: 'number' }, 
+              side: { type: 'string', enum: ['buy', 'sell'] } 
+            },
+            required: ['symbol', 'ratio_qty', 'side']
+          } 
+        },
         strategy: { type: 'string', enum: ['LONG_TERM', 'INTRADAY'] },
         thesis: { type: 'string', minLength: 15, maxLength: 300, description: 'Debes proveer una tesis real descriptiva, no un texto vacío.' },
       },
@@ -110,7 +127,8 @@ export async function executeExecuteTrade(args: string) {
       limitPrice: params.limitPrice || undefined,
       stopLoss: params.stopLoss || undefined,
       takeProfit: params.takeProfit || undefined,
-      category: params.category || undefined
+      category: params.category as any,
+      legs: params.legs || undefined
     });
 
     // Registrar en ExecutionLog local

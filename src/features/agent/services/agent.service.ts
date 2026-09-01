@@ -8,6 +8,7 @@ import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/
 import { closePositionTool, executeClosePosition } from '@/features/agent/tools/close-position.tool';
 import { commandScrappyTool, executeCommandScrappy } from '@/features/agent/tools/command-scrappy.tool';
 import { commandOctavioTool, executeCommandOctavio } from '@/features/agent/tools/command-octavio.tool';
+import { getOptionsChainTool, executeGetOptionsChain } from '@/features/agent/tools/get-options-chain.tool';
 import { registerWithdrawalTool, executeRegisterWithdrawal } from '@/features/agent/tools/register-withdrawal.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { getFriendlyToolName } from '@/shared/utils/tool-names';
@@ -40,7 +41,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       response = await createChatCompletionWithRetry({
         role: 'CEO',
         messages: currentMessages,
-        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool, commandOctavioTool, registerWithdrawalTool],
+        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool, commandOctavioTool, getOptionsChainTool, registerWithdrawalTool],
       });
     } catch (error: any) {
       if ((error.status === 400 && error.message?.includes('tool call validation failed')) || 
@@ -139,6 +140,8 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           result = await executeCommandScrappy(toolCall.function.arguments);
         } else if (toolCall.function.name === 'command_octavio') {
           result = await executeCommandOctavio(toolCall.function.arguments);
+        } else if (toolCall.function.name === 'get_options_chain') {
+          result = await executeGetOptionsChain(toolCall.function.arguments);
         }
 
         let displayResult = result;

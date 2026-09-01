@@ -85,6 +85,13 @@
 * **Solución:** En `ceo.loop.ts`, se le pasa explícitamente el `venue` ('bybit' o 'alpaca') a los sub-agentes en su System Prompt. El Quant Agent ahora sabe exactamente a qué exchange consultar.
 * **REGLA:** Respeta el parámetro `venue` en las iteraciones de trading. No asumas que Alpaca tiene cotizaciones cripto en el formato de Bybit.
 
+### [ISSUE] Alpaca Options API (Multi-Leg & OCC Format)
+
+* **Contexto:** El CEO Agent ahora tiene la habilidad de operar opciones financieras en Alpaca (Fase 2).
+* **Problema:** Operar opciones simples (Single-Leg) vs opciones combinadas (Multi-Leg como Spreads o Iron Condors) requiere estructuras de carga útil diferentes en la API de Alpaca. Un contrato simple usa el símbolo OCC (ej. `SPY260116C00550000`), mientras que un Multi-Leg usa `order_class: 'mleg'` y un array de `legs`.
+* **Solución:** En `alpaca.adapter.ts` (método `executeOrder`), se implementó la detección de la propiedad `legs` dentro del parámetro de entrada `OrderParams`. Si `category === 'option'` y existen `legs`, se rutea la orden como un Multi-Leg.
+* **REGLA:** Cuando el CEO o un sub-agente desee ejecutar una estrategia de opciones complejas (Multi-Leg) en Alpaca, **debe usar estrictamente** el parámetro `legs` en la tool `execute_trade` proveyendo los símbolos OCC y la configuración de compra/venta para cada pata, en lugar de intentar meter todo en el parámetro principal `symbol`.
+
 ---
 
 ## 3. Comportamiento y Validación del Agente

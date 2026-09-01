@@ -497,6 +497,8 @@ export class BybitAdapter implements IVenueAdapter {
       console.error('❌ Bybit Fetch Error (closed-pnl):', error.message);
       return null;
     }
+  }
+
   async getOptionsChain(baseCoin: string): Promise<any[]> {
     const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
     const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';

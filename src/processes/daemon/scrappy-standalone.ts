@@ -5,12 +5,23 @@ import { ANSI_COLORS } from '@/shared/constants/colors';
 // Activar Scrappy forzadamente para el modo standalone
 StateService.setScrappyConfig(true, 'BTCUSDT', 200, 20);
 
-const scrappyAscii = `${ANSI_COLORS.PINK}${ANSI_COLORS.BOLD}
-  ____  ____ ____      _    ____  ____ __   __        .-.
- / ___|/ ___|  _ \\    / \\  |  _ \\|  _ \\\\ \\ / /      __|| |
- \\___ \\ |   | |_) |  / _ \\ | |_) | |_) |\\ V /      |  || |.-.
-  ___) | |__|  _ <  / ___ \\|  __/|  __/  | |      \`--||_.-'
- |____/\\____|_| \\_\\/_/   \\_\\_|   |_|     |_|          || 
+const scrappyAscii = `${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}
+         _
+       _|_|_
+      |     |
+      |     |
+   _  |     |  _
+  | | |     | | |
+  | | |     | | |
+  \\_| |     | |_/
+      |     |
+      |_____|
+
+${ANSI_COLORS.PINK}  ____  ____ ____      _    ____  ____ __   __
+ / ___|/ ___|  _ \\    / \\  |  _ \\|  _ \\\\ \\ / /
+ \\___ \\ |   | |_) |  / _ \\ | |_) | |_) |\\ V / 
+  ___) | |__|  _ <  / ___ \\|  __/|  __/  | |  
+ |____/\\____|_| \\_\\/_/   \\_\\_|   |_|     |_|  
 ${ANSI_COLORS.RESET}`;
 
 const config = StateService.getScrappyState();

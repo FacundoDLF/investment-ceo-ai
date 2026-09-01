@@ -474,19 +474,28 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
 
   \x1b[0m`;
 
+  const asciiCrypto = `${ANSI_COLORS.MAGENTA}${ANSI_COLORS.BOLD}
+   ___  _   _ _  __   __   ____ ______   ______ _____ ___  
+  / _ \\| \\ | | | \\ \\ / /  / ___|  _ \\ \\ / /  _ \\_   _/ _ \\ 
+ | | | |  \\| | |  \\ V /  | |   | |_) \\ V /| |_) || || | | |
+ | |_| | |\\  | |___| |   | |___|  _ < | | |  __/ | || |_| |
+  \\___/|_| \\_|_____|_|    \\____|_| \\_\\|_| |_|    |_| \\___/ 
+  \x1b[0m`;
+
   const modeTitle = mode === 'crypto' 
-    ? `${ANSI_COLORS.MAGENTA}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: CRYPTO DEGEN) ${ANSI_COLORS.RESET}\n\n` +
+    ? `${asciiCrypto}\n` +
+      `  Investment CEO AI (Modo: CRYPTO DEGEN) \n\n` +
       `────────────────────────────────────────────────────────────────────────\n` +
       `  🚀 CONFIGURACIÓN DE MODO CRYPTO\n` +
       `────────────────────────────────────────────────────────────────────────\n` +
-      `  Broker Activo    : Bybit (Alpaca Ignorado)\n` +
-      `  Horario Mercado  : 24/7 (Siempre Abierto)\n` +
-      `  Escáner          : Markus Skinner (Activo cada 15m)\n` +
-      `  Frecuencia       : Aceleración dinámica activada\n` +
+      `  Mercado Tradicional (Alpaca) : 🔴 CERRADO / IGNORADO\n` +
+      `  Mercado Crypto (Bybit)       : 🟢 24/7 ABIERTO\n` +
+      `  Escáner Activo               : Markus Skinner (cada 15m)\n` +
+      `  Frecuencia                   : Aceleración dinámica activada\n` +
       `────────────────────────────────────────────────────────────────────────\n`
-    : `${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: Normal) ${ANSI_COLORS.RESET}\n`;
+    : `${asciiBrain}\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: Normal) ${ANSI_COLORS.RESET}\n`;
 
-  const finalAscii = asciiBrain + modeTitle;
+  const finalAscii = modeTitle;
   console.log(finalAscii);
   ModelRouter.printRegistryTable();
 

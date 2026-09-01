@@ -19,9 +19,11 @@ export async function runOctavioIteration() {
   try {
     const currentPnL = await MissionService.getOctavioPnL();
     if (currentPnL >= config.target && config.target > 0) {
-      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Octavio] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
-      await MissionService.resetOctavioPnL();
-      await MissionService.setOctavioReport(`¡SPRINT COMPLETADO! Superé la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0.`);
+      if (config.autoResetPnL !== false) {
+        console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Octavio] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
+        await MissionService.resetOctavioPnL();
+        await MissionService.setOctavioReport(`¡SPRINT COMPLETADO! Superé la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0.`);
+      }
     }
 
     const baseCoin = config.targetAsset.replace('USDT', '').replace('USDC', ''); // ej. BTC

@@ -27,9 +27,11 @@ export async function runScrappyIteration() {
     // 🛡️ REVISIÓN PROACTIVA DE ALCANCÍA (Por si el CEO bajó la meta abruptamente)
     const currentPnL = await MissionService.getScrappyPnL();
     if (currentPnL >= config.target && config.target > 0) {
-      console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Scrappy] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada pasivamente (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
-      await MissionService.resetScrappyPnL();
-      await MissionService.setScrappyReport(`¡SPRINT COMPLETADO! Se re-evaluó la alcancía y superó la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0. Sigo operando con normalidad.`);
+      if (config.autoResetPnL !== false) {
+        console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Scrappy] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada pasivamente (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
+        await MissionService.resetScrappyPnL();
+        await MissionService.setScrappyReport(`¡SPRINT COMPLETADO! Se re-evaluó la alcancía y superó la meta de $${config.target}. He consolidado $${currentPnL.toFixed(2)} de ganancias previas y he reiniciado mi alcancía a $0. Sigo operando con normalidad.`);
+      }
     }
 
     const symbol = config.targetAsset;

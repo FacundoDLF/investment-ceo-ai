@@ -6,6 +6,7 @@ export class StateService {
   private static scrappyTargetAsset = 'BTCUSDT';
   private static scrappyBudget = 200; // Presupuesto de $200 USD
   private static scrappyTarget = 20; // Meta de ganancias (10% por defecto)
+  private static scrappyAutoResetPnL = true;
   private static scrappyDirective: string | null = null; // Grito directo del CEO
 
   // Octavio State
@@ -13,6 +14,7 @@ export class StateService {
   private static octavioTargetAsset = 'BTCUSDT';
   private static octavioBudget = 200;
   private static octavioTarget = 20;
+  private static octavioAutoResetPnL = true;
   private static octavioDirective: string | null = null;
 
   static getCurrentCryptoAsset(): string {
@@ -29,12 +31,14 @@ export class StateService {
       active: this.scrappyActive,
       targetAsset: this.scrappyTargetAsset,
       budget: this.scrappyBudget,
-      target: this.scrappyTarget
+      target: this.scrappyTarget,
+      autoResetPnL: this.scrappyAutoResetPnL
     };
   }
 
-  static setScrappyConfig(active: boolean, asset?: string, budget?: number, target?: number): void {
+  static setScrappyConfig(active: boolean, asset?: string, budget?: number, target?: number, autoResetPnL: boolean = true): void {
     this.scrappyActive = active;
+    this.scrappyAutoResetPnL = autoResetPnL;
     if (asset) this.scrappyTargetAsset = asset.toUpperCase();
     
     if (budget && budget > 0) {
@@ -46,7 +50,7 @@ export class StateService {
     }
 
     if (target && target > 0) this.scrappyTarget = target;
-    console.log(`[StateService] Scrappy Config Actualizada: Activo=${this.scrappyActive}, Asset=${this.scrappyTargetAsset}, Budget=${this.scrappyBudget}, Target=${this.scrappyTarget}`);
+    console.log(`[StateService] Scrappy Config Actualizada: Activo=${this.scrappyActive}, Asset=${this.scrappyTargetAsset}, Budget=${this.scrappyBudget}, Target=${this.scrappyTarget}, AutoResetPnL=${this.scrappyAutoResetPnL}`);
   }
 
   static getScrappyDirective(): string | null {
@@ -65,12 +69,14 @@ export class StateService {
       active: this.octavioActive,
       targetAsset: this.octavioTargetAsset,
       budget: this.octavioBudget,
-      target: this.octavioTarget
+      target: this.octavioTarget,
+      autoResetPnL: this.octavioAutoResetPnL
     };
   }
 
-  static setOctavioConfig(active: boolean, asset?: string, budget?: number, target?: number): void {
+  static setOctavioConfig(active: boolean, asset?: string, budget?: number, target?: number, autoResetPnL: boolean = true): void {
     this.octavioActive = active;
+    this.octavioAutoResetPnL = autoResetPnL;
     if (asset) this.octavioTargetAsset = asset.toUpperCase();
     
     if (budget && budget > 0) {
@@ -81,7 +87,7 @@ export class StateService {
     }
 
     if (target && target > 0) this.octavioTarget = target;
-    console.log(`[StateService] Octavio Config Actualizada: Activo=${this.octavioActive}, Asset=${this.octavioTargetAsset}, Budget=${this.octavioBudget}, Target=${this.octavioTarget}`);
+    console.log(`[StateService] Octavio Config Actualizada: Activo=${this.octavioActive}, Asset=${this.octavioTargetAsset}, Budget=${this.octavioBudget}, Target=${this.octavioTarget}, AutoResetPnL=${this.octavioAutoResetPnL}`);
   }
 
   static getOctavioDirective(): string | null {

@@ -18,12 +18,13 @@ export interface OrderParams {
   side: 'buy' | 'sell';
   qty: number;
   type: 'market' | 'limit';
-  category?: 'spot' | 'linear';
+  category?: 'spot' | 'linear' | 'option';
   limitPrice?: number;
   stopLoss?: number;
   takeProfit?: number;
   reduceOnly?: boolean;
   postOnly?: boolean;
+  legs?: { symbol: string, ratio_qty: number, side: 'buy' | 'sell' }[]; // Multi-leg options
 }
 
 export interface Position {
@@ -93,7 +94,7 @@ export interface IVenueAdapter {
    * @param symbol Símbolo del activo.
    * @param category Categoría del activo (opcional).
    */
-  cancelAllOrders?(symbol: string, category?: 'linear' | 'spot'): Promise<void>;
+  cancelAllOrders?(symbol: string, category?: 'linear' | 'spot' | 'option'): Promise<void>;
 
   /**
    * Obtiene información sobre una posición cerrada recientemente.
@@ -101,4 +102,11 @@ export interface IVenueAdapter {
    * @returns Información de cierre o null si no se encontró.
    */
   getClosedPositionInfo?(symbol: string): Promise<{ reason: string; closedPnl: number } | null>;
+
+  /**
+   * Obtiene la cadena de opciones (Option Chain) para un activo base.
+   * @param baseCoin Moneda base (ej. 'BTC', 'ETH').
+   * @returns Un arreglo con los contratos de opciones disponibles.
+   */
+  getOptionsChain?(baseCoin: string): Promise<any[]>;
 }

@@ -7,6 +7,7 @@ import { consultAnalystTool, executeConsultAnalyst } from '@/features/agent/tool
 import { validateTradeIntentTool, executeValidateTradeIntent } from '@/features/agent/tools/validate-trade-intent.tool';
 import { closePositionTool, executeClosePosition } from '@/features/agent/tools/close-position.tool';
 import { commandScrappyTool, executeCommandScrappy } from '@/features/agent/tools/command-scrappy.tool';
+import { commandOctavioTool, executeCommandOctavio } from '@/features/agent/tools/command-octavio.tool';
 import { registerWithdrawalTool, executeRegisterWithdrawal } from '@/features/agent/tools/register-withdrawal.tool';
 import { CEO_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { getFriendlyToolName } from '@/shared/utils/tool-names';
@@ -39,7 +40,7 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
       response = await createChatCompletionWithRetry({
         role: 'CEO',
         messages: currentMessages,
-        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool, registerWithdrawalTool],
+        tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool, commandOctavioTool, registerWithdrawalTool],
       });
     } catch (error: any) {
       if ((error.status === 400 && error.message?.includes('tool call validation failed')) || 
@@ -136,6 +137,8 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           result = await executeClosePosition(toolCall.function.arguments);
         } else if (toolCall.function.name === 'command_scrappy') {
           result = await executeCommandScrappy(toolCall.function.arguments);
+        } else if (toolCall.function.name === 'command_octavio') {
+          result = await executeCommandOctavio(toolCall.function.arguments);
         }
 
         let displayResult = result;

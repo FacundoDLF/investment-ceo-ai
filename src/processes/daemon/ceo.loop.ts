@@ -13,6 +13,7 @@ import { prisma } from '@/shared/lib/prisma';
 import { getUnifiedBalance, getUnifiedPositions, getClosedPositionInfo, VenueName, executeOrder, cancelAllOrders } from '@/features/venues/venue.service';
 import { DAMAGE_CONTROL_MANDATE } from '@/features/agent/config/ceo.mandate';
 import { startScrappyDaemon } from './scrappy.loop';
+import { startOctavioDaemon } from './octavio.loop';
 import { ModelRouter } from '@/shared/constants/models';
 
 function getMarketStatus() {
@@ -75,6 +76,12 @@ async function runDaemonIteration(mode?: string) {
     if (scrappyState.active) {
       const currentScrappyPnL = await MissionService.getScrappyPnL();
       console.log(`${ANSI_COLORS.MAGENTA}🎯 Desafío Scrappy: Meta $${scrappyState.target} | PnL Actual: $${currentScrappyPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
+    }
+
+    const octavioState = StateService.getOctavioState();
+    if (octavioState.active) {
+      const currentOctavioPnL = await MissionService.getOctavioPnL();
+      console.log(`${ANSI_COLORS.CYAN}🎯 Desafío Octavio: Meta $${octavioState.target} | PnL Actual: $${currentOctavioPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
     }
 
     const activeVenues: VenueName[] = mode === TRADING_MODES.CRYPTO ? [VENUES.BYBIT] : [VENUES.ALPACA, VENUES.BYBIT];
@@ -171,6 +178,7 @@ async function runDaemonIteration(mode?: string) {
         console.log(`${ANSI_COLORS.RED}Ejecutando Botón de Pánico: Apagando agentes y liquidando todo a Market.${ANSI_COLORS.RESET}`);
 
         StateService.setScrappyConfig(false);
+        StateService.setOctavioConfig(false);
 
         for (const p of positions) {
           if (p.qty > 0) {
@@ -287,6 +295,11 @@ async function runDaemonIteration(mode?: string) {
         if (scrappyInactiveIterations >= 3) {
           marketContext += `\n🚨 **ALERTA CRÍTICA:** Scrappy ha estado inactivo por ${scrappyInactiveIterations} iteraciones. ¡DESPIÉRTALO AHORA! Es OBLIGATORIO que uses 'command_scrappy' en esta respuesta para asignarle una Misión Fetch (Presupuesto y Meta), incluso si lo haces investigar BTCUSDT u otra moneda.\n`;
         }
+
+        const octavioConfig = StateService.getOctavioState();
+        if (!octavioConfig.active) {
+          marketContext += `\n⚠️ Octavio (Especialista en Opciones) está actualmente APAGADO. Puedes usar 'command_octavio' para activarlo.\n`;
+        }
       }
 
       if (currentState !== 'RESEARCH_MODE') {
@@ -343,6 +356,15 @@ async function runDaemonIteration(mode?: string) {
       }
 
       const scrappyExclusion = scrappyConf.active && venue === 'bybit' ? ` IGNORA y NO CIERRES la posición en ${scrappyConf.targetAsset} porque es gestionada independientemente por el bot HFT Scrappy (no requiere thesis).` : '';
+
+      const octavioConf = StateService.getOctavioState();
+      if (octavioConf.active && venue === 'bybit') {
+        const octavioReport = await MissionService.getOctavioReport();
+        if (octavioReport && octavioReport !== "Sin reportes recientes. Esperando órdenes.") {
+          marketContext += `\n\n**MENSAJE URGENTE DE OCTAVIO (Opciones):**\n${octavioReport}\n(Evalúa si quieres apagarlo, subirle el budget, o dejarlo corriendo solo).`;
+          await MissionService.setOctavioReport("Sin reportes recientes. Esperando órdenes."); // Borrar buzón tras leerlo
+        }
+      }
 
       let agentPrompt = isDamageControl
         ? `ESTÁS EN MODO DAMAGE CONTROL. Revisa tus posiciones, cierra las que no tengan sentido o generen gran pérdida. NO ABRAS NUEVAS POSICIONES. REGLA ESTRICTA: SOLO estás autorizado a interactuar y modificar posiciones en el broker activo: ${venue.toUpperCase()}. Ignora por completo tu balance o posiciones en otros brokers.${scrappyExclusion}`
@@ -484,6 +506,10 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
     if (!scrappyState.active) {
       console.log(`${LOG_PREFIX.SCRAPPY} 💤 Mantenimiento en progreso (APAGADO). A la espera de directivas del CEO.\n`);
     }
+    const octavioStateLocal = StateService.getOctavioState();
+    if (!octavioStateLocal.active) {
+      console.log(`${ANSI_COLORS.CYAN}🐙 [Octavio] 💤 Mantenimiento en progreso (APAGADO). Esperando activación del CEO.\n${ANSI_COLORS.RESET}`);
+    }
     await new Promise(resolve => setTimeout(resolve, currentInterval * 1000));
   }
 }
@@ -493,6 +519,7 @@ if (require.main === module) {
 
   // Scrappy se inicia en todos los modos (tanto regular como crypto)
   startScrappyDaemon().catch(console.error);
+  startOctavioDaemon().catch(console.error);
 
   // Intervalo base de 60s, la lógica interna lo acelerará si es crypto y horario pico
   startCeoDaemon(SYSTEM_INTERVALS.CEO_BASE_SEC, modeArg).catch(console.error);

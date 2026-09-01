@@ -59,12 +59,28 @@ export class AlpacaAdapter implements IVenueAdapter {
     }
 
     const payload: any = {
-      symbol: params.symbol,
       qty: params.qty,
-      side: params.side,
       type: params.type,
       time_in_force: 'gtc'
     };
+
+    if (params.category === 'option') {
+      if (params.legs && params.legs.length > 0) {
+        payload.order_class = 'mleg';
+        payload.legs = params.legs;
+        // In mleg, symbol is not at root if it's a generic multi-leg, wait.
+        // Actually, Alpaca API requires 'symbol' only if it's not a generic mleg, but wait, 
+        // For mleg options, usually you omit symbol and just provide legs. 
+        // We'll pass symbol anyway if present.
+        if (params.symbol) payload.symbol = params.symbol;
+      } else {
+        payload.symbol = params.symbol;
+        payload.side = params.side;
+      }
+    } else {
+      payload.symbol = params.symbol;
+      payload.side = params.side;
+    }
 
     if (params.type === 'limit' && params.limitPrice) {
       payload.limit_price = params.limitPrice;
@@ -179,7 +195,34 @@ export class AlpacaAdapter implements IVenueAdapter {
     }));
   }
 
-  async cancelAllOrders(symbol: string, category: 'linear' | 'spot' = 'linear'): Promise<void> {
+  async cancelAllOrders(symbol: string, category: 'linear' | 'spot' | 'option' = 'linear'): Promise<void> {
     console.warn(`[Alpaca] cancelAllOrders not implemented yet for ${symbol}`);
+  }
+
+  async getOptionsChain(baseCoin: string): Promise<any[]> {
+    const apiKey = process.env.ALPACA_API_KEY_ID;
+    const secretKey = process.env.ALPACA_API_SECRET_KEY;
+    const isPaper = process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined;
+    const baseUrl = isPaper ? 'https://paper-api.alpaca.markets/v2' : (process.env.ALPACA_BASE_URL || 'https://api.alpaca.markets/v2');
+
+    if (!apiKey || !secretKey) {
+      throw new Error('Alpaca API credentials missing');
+    }
+
+    // Usar underlying_symbols
+    const response = await fetch(`${baseUrl}/options/contracts?underlying_symbols=${baseCoin}&limit=50&status=active`, {
+      headers: {
+        'APCA-API-KEY-ID': apiKey,
+        'APCA-API-SECRET-KEY': secretKey,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Alpaca Options API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.option_contracts || [];
   }
 }

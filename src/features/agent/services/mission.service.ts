@@ -153,4 +153,57 @@ export class MissionService {
     });
     return next;
   }
+
+  static async getOctavioPnL(): Promise<number> {
+    const mem = await prisma.ceoMemory.findUnique({ where: { key: `OCTAVIO_SESSION_PNL` } });
+    return mem ? parseFloat(mem.value) : 0;
+  }
+
+  static async addOctavioPnL(amount: number): Promise<number> {
+    const current = await this.getOctavioPnL();
+    const next = current + amount;
+    await prisma.ceoMemory.upsert({
+      where: { key: `OCTAVIO_SESSION_PNL` },
+      update: { value: next.toString() },
+      create: { key: `OCTAVIO_SESSION_PNL`, value: next.toString() }
+    });
+    return next;
+  }
+
+  static async resetOctavioPnL(): Promise<void> {
+    await prisma.ceoMemory.upsert({
+      where: { key: `OCTAVIO_SESSION_PNL` },
+      update: { value: "0" },
+      create: { key: `OCTAVIO_SESSION_PNL`, value: "0" }
+    });
+  }
+
+  static async getOctavioReport(): Promise<string> {
+    const mem = await prisma.ceoMemory.findUnique({ where: { key: `OCTAVIO_LAST_REPORT` } });
+    return mem ? mem.value : "Sin reportes recientes. Esperando órdenes.";
+  }
+
+  static async setOctavioReport(report: string): Promise<void> {
+    await prisma.ceoMemory.upsert({
+      where: { key: `OCTAVIO_LAST_REPORT` },
+      update: { value: report },
+      create: { key: `OCTAVIO_LAST_REPORT`, value: report }
+    });
+  }
+
+  static async getLifetimeOctavioPnL(): Promise<number> {
+    const mem = await prisma.ceoMemory.findUnique({ where: { key: `LIFETIME_OCTAVIO_PNL` } });
+    return mem ? parseFloat(mem.value) : 0;
+  }
+
+  static async addLifetimeOctavioPnL(amount: number): Promise<number> {
+    const current = await this.getLifetimeOctavioPnL();
+    const next = current + amount;
+    await prisma.ceoMemory.upsert({
+      where: { key: `LIFETIME_OCTAVIO_PNL` },
+      update: { value: next.toString() },
+      create: { key: `LIFETIME_OCTAVIO_PNL`, value: next.toString() }
+    });
+    return next;
+  }
 }

@@ -8,6 +8,13 @@ export class StateService {
   private static scrappyTarget = 20; // Meta de ganancias (10% por defecto)
   private static scrappyDirective: string | null = null; // Grito directo del CEO
 
+  // Octavio State
+  private static octavioActive = false;
+  private static octavioTargetAsset = 'BTCUSDT';
+  private static octavioBudget = 200;
+  private static octavioTarget = 20;
+  private static octavioDirective: string | null = null;
+
   static getCurrentCryptoAsset(): string {
     return this.currentCryptoAsset;
   }
@@ -50,6 +57,41 @@ export class StateService {
     this.scrappyDirective = directive;
     if (directive) {
       console.log(`[StateService] 📢 NUEVA DIRECTIVA DEL CEO PARA SCRAPPY: "${directive}"`);
+    }
+  }
+
+  static getOctavioState() {
+    return {
+      active: this.octavioActive,
+      targetAsset: this.octavioTargetAsset,
+      budget: this.octavioBudget,
+      target: this.octavioTarget
+    };
+  }
+
+  static setOctavioConfig(active: boolean, asset?: string, budget?: number, target?: number): void {
+    this.octavioActive = active;
+    if (asset) this.octavioTargetAsset = asset.toUpperCase();
+    
+    if (budget && budget > 0) {
+      this.octavioBudget = budget;
+      if (!target) {
+        this.octavioTarget = budget * 0.1;
+      }
+    }
+
+    if (target && target > 0) this.octavioTarget = target;
+    console.log(`[StateService] Octavio Config Actualizada: Activo=${this.octavioActive}, Asset=${this.octavioTargetAsset}, Budget=${this.octavioBudget}, Target=${this.octavioTarget}`);
+  }
+
+  static getOctavioDirective(): string | null {
+    return this.octavioDirective;
+  }
+
+  static setOctavioDirective(directive: string | null): void {
+    this.octavioDirective = directive;
+    if (directive) {
+      console.log(`[StateService] 📢 NUEVA DIRECTIVA DEL CEO PARA OCTAVIO: "${directive}"`);
     }
   }
 }

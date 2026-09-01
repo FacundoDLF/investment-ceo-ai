@@ -213,7 +213,11 @@ export class BybitAdapter implements IVenueAdapter {
     const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
     const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
 
-    const response = await fetch(`${baseUrl}/v5/market/tickers?category=linear&symbol=${symbol}`);
+    let category = 'linear';
+    if (symbol.includes('-')) {
+      category = 'option';
+    }
+    const response = await fetch(`${baseUrl}/v5/market/tickers?category=${category}&symbol=${symbol}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -249,7 +253,11 @@ export class BybitAdapter implements IVenueAdapter {
     const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
     const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
 
-    const response = await fetch(`${baseUrl}/v5/market/instruments-info?category=linear&symbol=${symbol}`);
+    let category = 'linear';
+    if (symbol.includes('-')) {
+      category = 'option';
+    }
+    const response = await fetch(`${baseUrl}/v5/market/instruments-info?category=${category}&symbol=${symbol}`);
     if (!response.ok) {
       throw new Error(`Bybit Instruments Info API error: ${response.status}`);
     }
@@ -300,8 +308,8 @@ export class BybitAdapter implements IVenueAdapter {
     const timestamp = Date.now().toString();
     const recvWindow = '5000';
 
-    const fetchPositionsForCoin = async (coin: string) => {
-      const queryString = `category=linear&settleCoin=${coin}`;
+    const fetchPositionsForCoin = async (coin: string, category: string = 'linear') => {
+      const queryString = `category=${category}&settleCoin=${coin}`;
       const signString = timestamp + apiKey + recvWindow + queryString;
       
       let signature = '';
@@ -351,7 +359,8 @@ export class BybitAdapter implements IVenueAdapter {
 
     const usdtPositions = await fetchPositionsForCoin('USDT');
     const usdcPositions = await fetchPositionsForCoin('USDC');
-    const allPositions = [...usdtPositions, ...usdcPositions];
+    const optionPositions = await fetchPositionsForCoin('USDC', 'option');
+    const allPositions = [...usdtPositions, ...usdcPositions, ...optionPositions];
 
     return allPositions.map((pos: any) => ({
       symbol: pos.symbol,
@@ -488,5 +497,21 @@ export class BybitAdapter implements IVenueAdapter {
       console.error('❌ Bybit Fetch Error (closed-pnl):', error.message);
       return null;
     }
+  async getOptionsChain(baseCoin: string): Promise<any[]> {
+    const useTestnet = process.env.PAPER_MODE_ONLY === 'true' || process.env.BYBIT_ENV === 'testnet';
+    const baseUrl = useTestnet ? 'https://api-demo.bybit.com' : 'https://api.bybit.com';
+
+    const response = await fetch(`${baseUrl}/v5/market/tickers?category=option&baseCoin=${baseCoin}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Bybit Options Chain API error: ${response.status} - ${errorText}`);
+    }
+
+    const json = await response.json();
+    if (json.retCode !== 0) {
+      throw new Error(`Bybit API Error: ${json.retMsg}`);
+    }
+
+    return json.result?.list || [];
   }
 }

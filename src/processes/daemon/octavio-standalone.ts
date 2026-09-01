@@ -6,11 +6,11 @@ import { ANSI_COLORS } from '@/shared/constants/colors';
 StateService.setOctavioConfig(true, 'BTCUSDT', 200, 20);
 
 const octavioAscii = `${ANSI_COLORS.LIME_GREEN}${ANSI_COLORS.BOLD}
-   ___   ____ _____  _  __     __ ___  ___         ,-. ,-.
-  / _ \\ / ___|_   _|/ \\ \\ \\   / /|_ _|/ _ \\       ( O | O )
- | | | | |     | | / _ \\ \\ \\ / /  | || | | |       \`-' \`-' 
- | |_| | |___  | |/ ___ \\ \\ V /   | || |_| |       [===]
-  \\___/ \\____| |_/_/   \\_\\ \\_/   |___|\\___/        
+   ___   ____ _____  _  __     __ ___  ___        ___    ___  
+  / _ \\ / ___|_   _|/ \\ \\ \\   / /|_ _|/ _ \\      /   \\  /   \\ 
+ | | | | |     | | / _ \\ \\ \\ / /  | || | | |    |   o| |   o| 
+ | |_| | |___  | |/ ___ \\ \\ V /   | || |_| |     \\___/  \\___/ 
+  \\___/ \\____| |_/_/   \\_\\ \\_/   |___|\\___/                   
 ${ANSI_COLORS.RESET}`;
 
 const config = StateService.getOctavioState();

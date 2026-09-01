@@ -480,6 +480,7 @@ export async function startCeoDaemon(initialIntervalSeconds = 60, mode?: string)
       `  🚀 CONFIGURACIÓN DE MODO CRYPTO\n` +
       `────────────────────────────────────────────────────────────────────────\n` +
       `  Broker Activo    : Bybit (Alpaca Ignorado)\n` +
+      `  Horario Mercado  : 24/7 (Siempre Abierto)\n` +
       `  Escáner          : Markus Skinner (Activo cada 15m)\n` +
       `  Frecuencia       : Aceleración dinámica activada\n` +
       `────────────────────────────────────────────────────────────────────────\n`

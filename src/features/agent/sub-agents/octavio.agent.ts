@@ -148,20 +148,22 @@ Reglas Críticas:
         console.log(`${LOG_PREFIX.OCTAVIO} [Acción] ${args.action} en ${args.symbol}. Razón: ${args.reason}`);
 
         try {
-          // Validar existencia del contrato 1 ms antes de ejecutar
+          // Validar existencia del contrato 1 ms antes de ejecutar y obtener reglas de lote
           console.log(`${LOG_PREFIX.OCTAVIO} Validando estado del contrato ${args.symbol} en el broker...`);
+          let instrumentInfo;
           try {
-            await import('@/features/venues/venue.service').then(m => m.getInstrumentInfo('bybit', args.symbol));
+            const m = await import('@/features/venues/venue.service');
+            instrumentInfo = await m.getInstrumentInfo('bybit', args.symbol);
           } catch (validationErr: any) {
             console.log(`${ANSI_COLORS.YELLOW}⚠️ [Octavio] Contrato inválido o expirado en el Broker: ${validationErr.message}. Abortando orden.${ANSI_COLORS.RESET}`);
             return;
           }
           if (args.action === 'OPEN_OPTION') {
-            // Lógica simplificada de qty (1 contrato para empezar)
+            const minQty = instrumentInfo?.minOrderQty || 0.1;
             await executeOrder('bybit', {
               symbol: args.symbol,
               side: args.side,
-              qty: 0.1, // En Bybit, BTC options mínimo suele ser 0.1 o 0.01 dependiendo
+              qty: minQty, // Dinámico según las reglas de la moneda
               type: 'market',
               category: 'option'
             });

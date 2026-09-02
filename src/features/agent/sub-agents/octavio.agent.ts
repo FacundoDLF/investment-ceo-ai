@@ -56,6 +56,20 @@ export async function runOctavioIteration() {
     const now = Date.now();
     if (myOptionsPositions.length > 0) {
       console.log(`${LOG_PREFIX.OCTAVIO} Monitoreando ${myOptionsPositions.length} posiciones de Opciones activas.`);
+      myOptionsPositions.forEach(p => {
+        const isCall = p.symbol.endsWith('-C');
+        const typeName = isCall ? 'CALL' : 'PUT';
+        const pnlPctStr = (p.unrealizedPlPc * 100).toFixed(2);
+        const color = p.unrealizedPlPc >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+        const sign = p.unrealizedPlPc > 0 ? '+' : '';
+        console.log(`${LOG_PREFIX.OCTAVIO} Calculando recorrido de ${p.symbol} (${typeName}):`);
+        console.log(`  ├─ Entrada : $${p.avgEntryPrice.toFixed(4)}`);
+        console.log(`  ├─ Actual  : $${p.currentPrice.toFixed(4)}`);
+        console.log(`  └─ Var %   : ${color}${sign}${pnlPctStr}%${ANSI_COLORS.RESET}`);
+      });
+      const targetPct = (config.target / config.budget) * 100;
+      const currentPct = (currentPnL / config.budget) * 100;
+      console.log(`${ANSI_COLORS.CYAN}  [Resumen] Presupuesto: $${config.budget.toFixed(2)} | Alcancía: $${currentPnL.toFixed(2)} (${currentPct.toFixed(2)}%) | Target: $${config.target.toFixed(2)} (Tier ~${targetPct.toFixed(0)}%)${ANSI_COLORS.RESET}`);
     } else {
       console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length}`);
     }

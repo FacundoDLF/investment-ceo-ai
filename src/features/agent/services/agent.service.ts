@@ -38,11 +38,15 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
   while (iterations < 5) {
     let response;
     try {
-      response = await createChatCompletionWithRetry({
+      const llmPromise = createChatCompletionWithRetry({
         role: 'CEO',
         messages: currentMessages,
         tools: [getAccountStateTool, validateTradeIntentTool, executeTradeTool, switchAssetTool, consultAnalystTool, closePositionTool, commandScrappyTool, commandOctavioTool, getOptionsChainTool, registerWithdrawalTool],
       });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("LLM_TIMEOUT: El modelo tardó más de 120 segundos en responder.")), 120000);
+      });
+      response = await Promise.race([llmPromise, timeoutPromise]);
     } catch (error: any) {
       if ((error.status === 400 && error.message?.includes('tool call validation failed')) || 
           error.message?.includes('tool_use_failed') ||

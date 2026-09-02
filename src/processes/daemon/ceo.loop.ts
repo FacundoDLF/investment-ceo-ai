@@ -16,7 +16,15 @@ import { startScrappyDaemon } from './scrappy.loop';
 import { startOctavioDaemon } from './octavio.loop';
 import { ModelRouter } from '@/shared/constants/models';
 
+let cachedMarketStatus = { bymaOpen: false, wsPreMarket: false, wsOpen: false, wsAfterHours: false };
+let lastMarketStatusCheck = 0;
+
 function getMarketStatus() {
+  const nowMs = Date.now();
+  if (nowMs - lastMarketStatusCheck < 60000) {
+    return cachedMarketStatus;
+  }
+
   const now = DateTime.now();
   const bymaTime = now.setZone('America/Argentina/Buenos_Aires');
   const wsTime = now.setZone('America/New_York');
@@ -45,7 +53,9 @@ function getMarketStatus() {
     }
   }
 
-  return { bymaOpen, wsPreMarket, wsOpen, wsAfterHours };
+  cachedMarketStatus = { bymaOpen, wsPreMarket, wsOpen, wsAfterHours };
+  lastMarketStatusCheck = nowMs;
+  return cachedMarketStatus;
 }
 
 let lastResearchTime = 0;
@@ -86,32 +96,40 @@ async function runDaemonIteration(mode?: string) {
 
     const activeVenues: VenueName[] = mode === TRADING_MODES.CRYPTO ? [VENUES.BYBIT] : [VENUES.ALPACA, VENUES.BYBIT];
 
-    // Ejecutar Research Agent cada 1 hora (SYSTEM_INTERVALS.RESEARCH_MS ms)
+    // Ejecutar Sub-Agentes Independientes de Forma Concurrente (Optimización 1.2)
     const now = Date.now();
+    const subAgentPromises: Promise<void>[] = [];
+
     if (now - lastResearchTime > SYSTEM_INTERVALS.RESEARCH_MS) {
       console.log(`${LOG_PREFIX.SISTEMA} Ejecutando a Richard Newman (Analista Macro/Noticias)...`);
-      cachedResearchReport = await runResearchAgent('Resumen macroeconómico, eventos clave del día y estado general del mercado de criptomonedas.');
-      lastResearchTime = now;
+      subAgentPromises.push(
+        runResearchAgent('Resumen macroeconómico, eventos clave del día y estado general del mercado de criptomonedas.')
+          .then(res => { cachedResearchReport = res; lastResearchTime = now; })
+      );
     } else {
       console.log(`${LOG_PREFIX.SISTEMA} Usando caché de Richard Newman (Menos de 1h desde la última ejecución).`);
     }
 
-    // Ejecutar Market Scanner cada 15 minutos (SYSTEM_INTERVALS.SCANNER_MS ms)
     if (mode === TRADING_MODES.CRYPTO) {
       if (now - lastScannerTime > SYSTEM_INTERVALS.SCANNER_MS) {
         console.log(`${LOG_PREFIX.SISTEMA} Ejecutando a Markus Skinner (Escáner de Mercado)...`);
-        cachedScannerReport = await runMarketScanner();
-        lastScannerTime = now;
+        subAgentPromises.push(
+          runMarketScanner()
+            .then(res => { cachedScannerReport = res; lastScannerTime = now; })
+        );
       } else {
         console.log(`${LOG_PREFIX.SISTEMA} Usando caché de Markus Skinner (Menos de 15m desde la última ejecución).`);
       }
     }
 
-    for (const venue of activeVenues) {
-      if (frozenVenues.has(venue)) {
-        console.log(`\n${LOG_PREFIX.SISTEMA} OMITIENDO ${venue.toUpperCase()}: El broker se encuentra CONGELADO por Circuit Breaker.`);
-        continue;
-      }
+    await Promise.all(subAgentPromises);
+
+    await Promise.allSettled(activeVenues.map(async (venue) => {
+      try {
+        if (frozenVenues.has(venue)) {
+          console.log(`\n${LOG_PREFIX.SISTEMA} OMITIENDO ${venue.toUpperCase()}: El broker se encuentra CONGELADO por Circuit Breaker.`);
+          return;
+        }
       console.log(`\n${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}========== [ EVALUANDO CARTERA: ${venue.toUpperCase()} ] ==========${ANSI_COLORS.RESET}`);
       console.log(`${LOG_PREFIX.SISTEMA} Consultando estado de billetera real en ${venue}...`);
       const balance = await getUnifiedBalance(venue);
@@ -132,19 +150,24 @@ async function runDaemonIteration(mode?: string) {
       // Calcular Unrealized PnL
       const positions = await getUnifiedPositions(venue).catch(() => []);
 
-      // Rastrear posiciones cerradas
+      // Rastrear posiciones cerradas (Optimización 1.4: Promise.all)
       if (iterationCount > 1) {
         const currentSymbols = new Set(positions.map(p => p.symbol));
+        const closedPromises = [];
         for (const [symbol, pos] of Object.entries(lastPositionsMap[venue] || {})) {
           if (!currentSymbols.has(symbol)) {
-            const closedInfo = await getClosedPositionInfo(venue, symbol).catch(() => null);
-            const reason = closedInfo ? closedInfo.reason : 'Broker (Automático)';
-            const pnl = closedInfo ? closedInfo.closedPnl : 0;
-            const msgColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
-            const sign = pnl >= 0 ? '+' : '';
-            console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
+            closedPromises.push(
+              getClosedPositionInfo(venue, symbol).catch(() => null).then(closedInfo => {
+                const reason = closedInfo ? closedInfo.reason : 'Broker (Automático)';
+                const pnl = closedInfo ? closedInfo.closedPnl : 0;
+                const msgColor = pnl >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+                const sign = pnl >= 0 ? '+' : '';
+                console.log(`${LOG_PREFIX.CEO_TRADER} ${msgColor}Aviso: La posición en ${symbol} fue cerrada (${reason}). PnL Realizado: ${sign}$${pnl.toFixed(2)}${ANSI_COLORS.RESET}`);
+              })
+            );
           }
         }
+        await Promise.all(closedPromises);
       }
 
       lastPositionsMap[venue] = {};
@@ -160,15 +183,18 @@ async function runDaemonIteration(mode?: string) {
       console.log(`${ANSI_COLORS.GRAY}  ├─ Spot (Liquidez) : ${ANSI_COLORS.GREEN}$${spot.toFixed(2)}${ANSI_COLORS.RESET}`);
       console.log(`${ANSI_COLORS.GRAY}  └─ Unrealized PnL  : ${pnlColor}$${totalUnrealizedPnL.toFixed(2)} (${(pnlPercentage * 100).toFixed(2)}%)${ANSI_COLORS.RESET}`);
 
-      // Dynamic logging of spot coins
+      // Dynamic logging of spot coins (Optimización 2.3: Filtrado de Ruido "Dust")
       if (balance.coins && balance.coins.length > 0) {
         console.log(`${ANSI_COLORS.CYAN}  PORTAFOLIO SPOT (Actualizado)${ANSI_COLORS.RESET}`);
-        balance.coins.forEach((c, index) => {
-          const isLast = index === balance.coins!.length - 1;
+        const validCoins = balance.coins.filter(c => (c.usdValue !== undefined && c.usdValue >= 1.0) || c.symbol === 'USDT' || c.symbol === 'USDC');
+        validCoins.forEach((c, index) => {
+          const isLast = index === validCoins.length - 1;
           const prefix = isLast ? '└─' : '├─';
           const usdVal = c.usdValue !== undefined ? ` (~$${c.usdValue.toFixed(2)})` : '';
           console.log(`${ANSI_COLORS.GRAY}  ${prefix} ${c.symbol.padEnd(6)}: ${ANSI_COLORS.GREEN}${c.balance}${ANSI_COLORS.GRAY}${usdVal}${ANSI_COLORS.RESET}`);
         });
+        const dustCount = balance.coins.length - validCoins.length;
+        if (dustCount > 0) console.log(`${ANSI_COLORS.GRAY}  └─ (+ ${dustCount} activos menores a $1 USD omitidos)${ANSI_COLORS.RESET}`);
       }
       console.log('');
 
@@ -180,18 +206,22 @@ async function runDaemonIteration(mode?: string) {
         StateService.setScrappyConfig(false);
         StateService.setOctavioConfig(false);
 
+        // EMERGENCY CIRCUIT BREAKER ASÍNCRONO (Optimización 1.3)
+        const emergencyPromises: Promise<any>[] = [];
         for (const p of positions) {
           if (p.qty > 0) {
             console.log(`[Circuit Breaker] Cancelando órdenes y cerrando ${p.symbol}...`);
-            await cancelAllOrders(venue, p.symbol, 'linear').catch(() => { });
-            await executeOrder(venue, {
-              symbol: p.symbol,
-              side: p.side === 'buy' ? 'sell' : 'buy',
-              qty: p.qty,
-              type: 'market',
-              category: 'linear',
-              reduceOnly: true
-            }).catch(() => { });
+            emergencyPromises.push(
+              cancelAllOrders(venue, p.symbol, 'linear').catch(() => { })
+                .then(() => executeOrder(venue, {
+                  symbol: p.symbol,
+                  side: p.side === 'buy' ? 'sell' : 'buy',
+                  qty: p.qty,
+                  type: 'market',
+                  category: 'linear',
+                  reduceOnly: true
+                }).catch(() => { }))
+            );
           }
         }
 
@@ -199,21 +229,24 @@ async function runDaemonIteration(mode?: string) {
           for (const c of balance.coins) {
             if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
               const spotSymbol = `${c.symbol}USDT`;
-              await cancelAllOrders(venue, spotSymbol, 'spot').catch(() => { });
-              await executeOrder(venue, {
-                symbol: spotSymbol,
-                side: 'sell',
-                qty: c.balance,
-                type: 'market',
-                category: 'spot'
-              }).catch(() => { });
+              emergencyPromises.push(
+                cancelAllOrders(venue, spotSymbol, 'spot').catch(() => { })
+                  .then(() => executeOrder(venue, {
+                    symbol: spotSymbol,
+                    side: 'sell',
+                    qty: c.balance,
+                    type: 'market',
+                    category: 'spot'
+                  }).catch(() => { }))
+              );
             }
           }
         }
+        await Promise.all(emergencyPromises);
 
         console.log(`${ANSI_COLORS.RED}${ANSI_COLORS.BOLD}⚠️ LIQUIDACIÓN COMPLETADA EN ${venue.toUpperCase()}. EL BROKER SE CONGELARÁ (FROZEN) POR SEGURIDAD. ⚠️${ANSI_COLORS.RESET}`);
         frozenVenues.add(venue);
-        continue;
+        return;
       }
 
       // Si el margen disponible es negativo/cero, o el PnL es muy negativo (-5%), forzar Damage Control
@@ -222,14 +255,14 @@ async function runDaemonIteration(mode?: string) {
         console.log(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}⚠️ ALERTA ROJA: Entrando en MODO DAMAGE CONTROL (PnL: ${(pnlPercentage * 100).toFixed(2)}%, Futuros: $${futures.toFixed(2)})${ANSI_COLORS.RESET}`);
       }
 
-      // Registrar Snapshot en BD
-      await prisma.performanceSnapshot.create({
+      // Registrar Snapshot en BD (Optimización 3.1: Fire and Forget)
+      prisma.performanceSnapshot.create({
         data: {
           totalEquity: balance.cash,
           unrealizedPnL: totalUnrealizedPnL,
           notes: `Iteración #${iterationCount} (${venue}) - Estado: ${isDamageControl ? 'DAMAGE_CONTROL' : (iterationCount % 5 === 0 ? 'AUDIT' : 'NORMAL')}`
         }
-      });
+      }).catch(err => console.error(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.GRAY}Error guardando analítica en BD: ${err.message}${ANSI_COLORS.RESET}`));
 
       if (isDamageControl) {
         currentState = 'DAMAGE_CONTROL';
@@ -314,16 +347,20 @@ async function runDaemonIteration(mode?: string) {
 
       console.log(`${LOG_PREFIX.SISTEMA} Evaluando ejecución de Sub-Agentes...`);
 
-      // El quant agent analiza SPY en alpaca, o criptos en bybit
+      // El quant agent analiza SPY en alpaca, o criptos en bybit (Optimización 3.2: Top N assets)
       const targetAsset = venue === 'bybit' ? StateService.getCurrentCryptoAsset() : 'SPY';
       const assetsToAnalyze = new Set<string>();
       assetsToAnalyze.add(targetAsset);
 
       if (venue === 'bybit' && balance.coins) {
-        balance.coins.forEach(c => {
-          if (c.symbol !== 'USDT' && c.symbol !== 'USDC') {
-            assetsToAnalyze.add(`${c.symbol}USDT`);
-          }
+        // Filtrar solo las monedas más relevantes (Top 5)
+        const topCoins = balance.coins
+          .filter(c => c.symbol !== 'USDT' && c.symbol !== 'USDC' && c.usdValue && c.usdValue > 5)
+          .sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0))
+          .slice(0, 5);
+          
+        topCoins.forEach(c => {
+          assetsToAnalyze.add(`${c.symbol}USDT`);
         });
       }
 
@@ -433,7 +470,10 @@ async function runDaemonIteration(mode?: string) {
         console.log(`${ANSI_COLORS.CYAN}Avanzando al Tier ${nextTier} (${(nextPercentage * 100).toFixed(0)}%). Nueva meta efectiva: $${newTarget.toFixed(2)}.${ANSI_COLORS.RESET}\n`);
       }
 
-    } // Fin bucle venues
+      } catch (err: any) {
+        console.error(`${LOG_PREFIX.SISTEMA} ${ANSI_COLORS.RED}[Error en Venue ${venue.toUpperCase()}] ${err.message}${ANSI_COLORS.RESET}`);
+      }
+    })); // Fin bucle venues
 
   } catch (error: any) {
     if (error.message?.includes('tool_use_failed') || error.message?.includes('tool call validation failed')) {
@@ -519,18 +559,28 @@ ${ANSI_COLORS.MAGENTA}   ___  _   _ _  __   __   ____ ______   ______ _____ ___
 
     let currentInterval = initialIntervalSeconds;
 
-    // Aceleración Dinámica para Crypto
-    if (mode === TRADING_MODES.CRYPTO) {
-      const now = DateTime.now().setZone('America/New_York');
-      const totalMinutes = now.hour * 60 + now.minute;
+    // Aceleración Dinámica según el Mercado
+    const now = DateTime.now().setZone('America/New_York');
+    const totalMinutes = now.hour * 60 + now.minute;
 
+    if (mode === TRADING_MODES.CRYPTO) {
+      // Crypto Peaks
       const isMorningPeak = totalMinutes >= 9 * 60 + 30 && totalMinutes <= 11 * 60 + 30; // 09:30 a 11:30 NY
       const isAsianPeak = totalMinutes >= 20 * 60 && totalMinutes <= 22 * 60; // 20:00 a 22:00 NY
-
+      
       if (isMorningPeak || isAsianPeak) {
-        currentInterval = SYSTEM_INTERVALS.CEO_PEAK_SEC; // Aceleración: cada 5 segundos en horarios pico
+        currentInterval = SYSTEM_INTERVALS.CEO_PEAK_SEC; // Aceleración
       } else {
-        currentInterval = SYSTEM_INTERVALS.CEO_BASE_SEC; // Valle: cada 60 segundos
+        currentInterval = SYSTEM_INTERVALS.CEO_BASE_SEC; // Valle
+      }
+    } else {
+      // Normal (Stocks) - Wall Street Open Market
+      const isMarketOpen = totalMinutes >= 9 * 60 + 30 && totalMinutes < 16 * 60; // 09:30 a 16:00 NY
+      
+      if (isMarketOpen && now.weekday <= 5) { // Lunes a Viernes
+        currentInterval = SYSTEM_INTERVALS.CEO_PEAK_SEC; // Aceleración en mercado abierto (5s)
+      } else {
+        currentInterval = SYSTEM_INTERVALS.CEO_BASE_SEC; // 60s si está cerrado
       }
     }
 

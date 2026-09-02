@@ -56,7 +56,7 @@ export async function executeCommandScrappy(args: string): Promise<any> {
     let target: number | undefined = undefined;
 
     if (baseCapital !== undefined && baseCapital > 0) {
-      const bMult = budgetMultiplier !== undefined ? budgetMultiplier : 0.2;
+      const bMult = budgetMultiplier !== undefined ? budgetMultiplier : 0.4;
       const tMult = targetMultiplier !== undefined ? targetMultiplier : 0.1;
       
       // Fórmula de Riesgo Lineal: Budget = BaseCapital * budgetMultiplier

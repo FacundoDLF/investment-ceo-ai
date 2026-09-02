@@ -13,6 +13,8 @@ import { cancelAllOrders, getUnifiedPositions } from '@/features/venues/venue.se
 let lastLogTime = 0;
 let lastHeartbeatTime = 0;
 let lastActionTime = 0;
+let lastLlmInvocationTime = 0;
+let lastLlmInvocationPrice = 0;
 
 // Trailing Stop State
 let trailingMaxPnl = 0;
@@ -35,13 +37,16 @@ export async function runScrappyIteration() {
     }
 
     const symbol = config.targetAsset;
-    const priceData = await getMarketPrice('bybit', symbol);
+
+    // 1. Obtener estado real del broker en paralelo (I/O)
+    const [priceData, positions] = await Promise.all([
+      getMarketPrice('bybit', symbol),
+      getUnifiedPositions('bybit')
+    ]);
+
     const midPrice = (priceData.bid + priceData.ask) / 2;
     const spread = priceData.ask - priceData.bid;
     const spreadPct = (spread / midPrice) * 100;
-
-    // 1. Obtener estado real del broker (STATELESS)
-    const positions = await getUnifiedPositions('bybit');
     const myPosition = positions.find((p: Position) => p.symbol === symbol && p.qty > 0);
 
     let pnlPct = 0;
@@ -60,6 +65,17 @@ export async function runScrappyIteration() {
         trailingMaxPnl = 0;     // Resetear marca de agua
         await executeScalpAction('CLOSE_POSITION', symbol, config, priceData, myPosition, pnlPct, true);
         return; // Detener iteración para no invocar al LLM
+      }
+
+      // 🛡️ HARD STOP LOSS (Damage Control)
+      if (pnlPct <= -5.00) {
+        console.log(`\n======================================================`);
+        console.log(`${ANSI_COLORS.RED}💀 [HARD STOP LOSS] Pérdida crítica detectada (${pnlPct.toFixed(2)}%). Ejecutando Damage Control inmediato para liberar capital...${ANSI_COLORS.RESET}`);
+        console.log(`======================================================\n`);
+        trailingActive = false;
+        trailingMaxPnl = 0;
+        await executeScalpAction('CLOSE_POSITION', symbol, config, priceData, myPosition, pnlPct, false);
+        return; // Detener iteración
       }
 
       const now = Date.now();
@@ -85,8 +101,27 @@ export async function runScrappyIteration() {
       await cancelAllOrders('bybit', symbol, 'linear').catch(() => { });
     }
 
-    let directiveText = "";
+    // 🛡️ PREVENCIÓN DE SPAM LLM (Throttle HFT)
+    const nowMs = Date.now();
+    const timeSinceLastLlm = nowMs - lastLlmInvocationTime;
+    const priceChangePct = lastLlmInvocationPrice > 0 ? Math.abs((midPrice - lastLlmInvocationPrice) / lastLlmInvocationPrice) * 100 : 100;
     const ceoDirective = StateService.getScrappyDirective();
+
+    // Solo invocar al LLM si hay directiva, pasaron 15s, o el precio se movió significativamente (>0.05%)
+    if (!ceoDirective && timeSinceLastLlm < 15000 && priceChangePct < 0.05) {
+       // Heartbeat Logging pasivo para cuando el LLM está en throttle
+       if (nowMs - lastHeartbeatTime > 30000) {
+         if (!myPosition) {
+           console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 🐕 Rastreando ${symbol}... (Spread: ${spreadPct.toFixed(4)}% | Alcancía: $${currentPnL.toFixed(2)})`);
+         }
+         lastHeartbeatTime = nowMs;
+       }
+       return; // Throttle: no invocar al LLM
+    }
+    lastLlmInvocationTime = nowMs;
+    lastLlmInvocationPrice = midPrice;
+
+    let directiveText = "";
     if (ceoDirective) {
       console.log(`${ANSI_COLORS.YELLOW}[Scrappy] ¡Grito del CEO recibido ("${ceoDirective}")! Inyectando orden de emergencia en el motor HFT...${ANSI_COLORS.RESET}`);
       directiveText = `\n\n⚠️ [DIRECTIVA URGENTE DEL CEO]: "${ceoDirective}"\n¡DEBES OBEDECER ESTA INSTRUCCIÓN INMEDIATAMENTE EN TU PRÓXIMA ACCIÓN!`;
@@ -126,12 +161,18 @@ Reglas Críticas:
       }
     };
 
-    const response = await createChatCompletionWithRetry({
+    const llmPromise = createChatCompletionWithRetry({
       role: 'EXECUTOR',
       messages: [{ role: 'system', content: systemPrompt }],
       tools: [scalpTool],
       tool_choice: { type: 'function', function: { name: 'scalp_action' } }
     });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("LLM_TIMEOUT: El modelo HFT tardó más de 8 segundos en responder.")), 8000);
+    });
+
+    const response = await Promise.race([llmPromise, timeoutPromise]);
 
     const msg = response.choices[0]?.message;
     if (msg?.tool_calls && msg.tool_calls.length > 0) {
@@ -164,7 +205,6 @@ Reglas Críticas:
             lastHeartbeatTime = now;
           }
         }
-
         await executeScalpAction(action, symbol, config, priceData, myPosition, pnlPct);
       }
     }
@@ -191,6 +231,11 @@ async function executeScalpAction(
       if (!isTrailingExecution && pnlPct >= 0 && pnlPct < 0.50) {
         return; // Anular orden silenciosamente
       }
+
+      const sign = pnlPct > 0 ? '+' : '';
+      console.log(`\n======================================================`);
+      console.log(`${ANSI_COLORS.GREEN}[Scrappy CERRANDO POSICIÓN]${ANSI_COLORS.RESET} 💰 Ejecutando orden en ${symbol} (PnL: ${sign}${pnlPct.toFixed(2)}%)`);
+      console.log(`======================================================\n`);
       if (pnlPct >= 0) {
         // TAKE PROFIT: LIMIT POST-ONLY MAKER ORDER
         const limitPrice = myPosition.side === 'buy' ? priceData.ask : priceData.bid;
@@ -291,10 +336,14 @@ async function executeScalpAction(
 
       if (myPosition) {
         // DCA (Dollar Cost Averaging)
-        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy]${ANSI_COLORS.RESET} 📉 ¡Promediando a la baja (DCA)! Comprando más ${symbol} a $${currentPrice.toFixed(2)} (PnL Actual: ${pnlColor}${sign}${pnlPct.toFixed(2)}%${ANSI_COLORS.RESET})`);
+        console.log(`\n======================================================`);
+        console.log(`${ANSI_COLORS.MAGENTA}[Scrappy DCA]${ANSI_COLORS.RESET} 📉 ¡Promediando a la baja (DCA)! Comprando más ${symbol} a $${currentPrice.toFixed(2)} (PnL flotante: ${pnlColor}${sign}${pnlPct.toFixed(2)}%${ANSI_COLORS.RESET})`);
+        console.log(`======================================================\n`);
         await cancelAllOrders('bybit', symbol, 'linear').catch(() => { }); // Limpiar TPs antiguos
       } else {
-        console.log(`${ANSI_COLORS.PINK}[Scrappy]${ANSI_COLORS.RESET} ¡Grrr! Atacó con un ${sideStr} en ${symbol} a $${currentPrice.toFixed(2)} (Entrada Inicial)`);
+        console.log(`\n======================================================`);
+        console.log(`${ANSI_COLORS.PINK}[Scrappy ATAQUE]${ANSI_COLORS.RESET} 🎯 ¡Entrando al mercado! ${sideStr} en ${symbol} a $${currentPrice.toFixed(2)}`);
+        console.log(`======================================================\n`);
       }
 
       // 🛡️ HFT: Zero Slippage & Maker Fees. Entramos con Limit Post-Only.

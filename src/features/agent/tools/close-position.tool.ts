@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
-import { getUnifiedPositions, executeOrder, VenueName, getInstrumentInfo } from '@/features/venues/venue.service';
+import { getUnifiedPositions, executeOrder, VenueName, getInstrumentInfo, cancelAllOrders } from '@/features/venues/venue.service';
 import { prisma } from '@/shared/lib/prisma';
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 import { MissionService } from '@/features/agent/services/mission.service';
@@ -71,6 +71,7 @@ export async function executeClosePosition(args: string): Promise<any> {
     await MissionService.addLifetimeCeoPnL(params.venue as VenueName, realizedPnlEstimate);
 
     // Ejecutar la orden de cierre
+    await cancelAllOrders(params.venue as VenueName, params.symbol, 'linear').catch(() => {});
     const result = await executeOrder(params.venue as VenueName, {
       symbol: params.symbol,
       side: side,

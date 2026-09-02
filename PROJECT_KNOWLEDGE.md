@@ -114,4 +114,25 @@
 * **Contexto:** El sub-agente Scrappy intentaba abrir posiciones o hacer DCA en Bybit.
 * **Problema:** Bybit requiere que el valor de la orden (precio * cantidad) sea de al menos 5 USDT para la mayoría de los pares en derivados. Como Scrappy usaba un presupuesto fijo (budget), cuando este presupuesto era menor a 5 USDT (ej. por bajo capital general o saldo residual), la API rechazaba las órdenes arrojando `Order does not meet minimum order value 5USDT`.
 * **Solución:** Se implementó una validación matemática de `orderValue = qty * currentPrice` tanto en la configuración inicial del agente (`command-scrappy.tool.ts`) como en el loop de ejecución de HFT (`scrappy.agent.ts`). Si el valor de la orden es inferior a 5 USDT, el sistema o Scrappy descartan la orden para no atacar en vano la API.
-* **REGLA:** Siempre que se envíen órdenes en derivados de Bybit, se debe comprobar que el tamaño en dólares de la posición (`qty * price`) sea igual o mayor al `minOrderValue` (5 USDT) ANTES de enviarla a la API.
+* **REGLA:** Siempre que se envíen órdenes en derivados de Bybit, se debe comprobar que el tamaño en dólares de la posición (`qty * price`) sea igual o mayor al `minOrderValue` (5 USDT) ANTES de enviarla a la API.
+
+### [ISSUE] Prisma Client Error: The table `public.[TableName]` does not exist in the current database
+
+* **Contexto:** Al correr el daemon (ej. `npm run ceo`), Prisma intentó hacer una operación en la base de datos (ej. `prisma.performanceSnapshot.create()`).
+* **Problema:** El esquema de Prisma (`schema.prisma`) tiene un modelo nuevo o modificado (ej. `PerformanceSnapshot`) pero la base de datos física (PostgreSQL u otra) no está sincronizada con esos cambios, generando que la tabla no exista.
+* **Solución:** Se corrió el comando `npx prisma migrate dev --name <nombre>` (o `npx prisma db push`) para empujar los cambios locales del esquema a la base de datos física y generar la migración.
+* **REGLA:** Cuando ocurran errores de tabla no existente o invocaciones inválidas de prisma relativas a la base de datos, siempre verifica el esquema y sincroniza la DB con `npx prisma migrate dev` o `npx prisma db push`.
+
+### [ISSUE] Infinite Drawdown (Todo en Rojo) en Bots Standalones
+
+* **Contexto:** Los sub-agentes Scrappy (Scalper) y Octavio (Opciones) operaron en bucle y sus PnL flotantes se volvieron profundamente negativos, sin cerrar nunca las posiciones.
+* **Problema:** Los LLMs tienen restricciones estrictas ("No cierres en pérdida") que causan que ante una fuerte tendencia en contra, mantengan la posición para siempre haciendo DCA hasta que se acaba el presupuesto. Además, las Opciones financieras sufren de Theta Decay, perdiendo todo su valor si se holdean mucho tiempo.
+* **Solución:** Se implementó una barrera matemática (Hard Stop Loss) directamente en los bucles `scrappy.agent.ts` y `octavio.agent.ts` **previa** a la invocación del LLM. Si Scrappy llega a un flotante de `-5.00%` o Octavio a un `-40.0%`, el código inyecta una orden `CLOSE_POSITION` por Damage Control (Market order), sin consultar al LLM.
+* **REGLA:** NUNCA permitas que los sub-agentes HFT dependan 100% del LLM para liquidar posiciones en escenarios de pérdida crítica. Las decisiones de Stop Loss deben estar harcodeadas (hardcoded) matemáticamente en el código como barrera de seguridad de último recurso.
+
+### [ISSUE] Alpaca API Error 403 Forbidden (Insufficient qty available for order) al cerrar posición
+
+* **Contexto:** El CEO intentaba cerrar una posición de acciones en Alpaca (ej. SPY) utilizando la herramienta `close_position`.
+* **Problema:** Alpaca devolvía `403 Forbidden` con el mensaje `insufficient qty available for order... held_for_orders`. Esto ocurre porque las acciones que el CEO intentaba vender ya estaban comprometidas ("held") en otra orden abierta (por ejemplo, una orden límite de Take Profit o Stop Loss colocada previamente). En Alpaca, no puedes vender a mercado acciones que ya tienen una orden de venta pendiente.
+* **Solución:** Se implementó el método `cancelAllOrders` en `alpaca.adapter.ts` (que hace un `DELETE` a las órdenes abiertas del símbolo), y se modificó `close-position.tool.ts` para invocar este método siempre antes de ejecutar la orden Market de cierre.
+* **REGLA:** Siempre que intentes cerrar una posición de forma programática (Market Order), debes cancelar TODAS las órdenes abiertas de ese símbolo (`cancelAllOrders`) para liberar la liquidez/acciones comprometidas.

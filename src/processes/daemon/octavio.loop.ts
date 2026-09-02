@@ -6,12 +6,15 @@ export async function startOctavioDaemon() {
   
   // Bucle infinito silencioso
   while (true) {
+    let shouldWait = true;
     try {
-      await runOctavioIteration();
+      shouldWait = await runOctavioIteration();
     } catch (error) {
       // Ignorar errores para no spamear la consola
     }
     // Esperar 5 segundos entre iteraciones para no saturar la API
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    if (shouldWait !== false) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
   }
 }

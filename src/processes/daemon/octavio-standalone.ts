@@ -43,7 +43,7 @@ async function startDynamicStandalone() {
 
   const initCycle = async () => {
     const balance = await getUnifiedBalance('bybit');
-    standaloneBudget = balance.cash * 0.5;
+    standaloneBudget = balance.cash * 0.4;
     standaloneTier = 1;
     currentTarget = getTierTarget(standaloneBudget, standaloneTier);
     StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', standaloneBudget, currentTarget, false);
@@ -53,7 +53,7 @@ async function startDynamicStandalone() {
     console.log(`${ANSI_COLORS.BOLD}  OCTAVIO HFT OPTIONS (Modo Standalone Dinámico)${ANSI_COLORS.RESET}`);
     console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
     console.log(`  Capital ByBit : $${balance.cash.toFixed(2)}`);
-    console.log(`  Presupuesto   : $${standaloneBudget.toFixed(2)} (50%)`);
+    console.log(`  Presupuesto   : $${standaloneBudget.toFixed(2)} (40%)`);
     console.log(`  Meta Tier 1   : $${currentTarget.toFixed(2)} (5%)`);
     console.log(`  Target Assets : ROTACIÓN MASIVA (8 Monedas)`);
     console.log(`  Directiva     : Análisis de Griegas y Caza de Primas`);
@@ -63,9 +63,12 @@ async function startDynamicStandalone() {
   await initCycle();
   console.log(`${ANSI_COLORS.YELLOW}[Sistema] Iniciando demonio dinámico de Octavio...${ANSI_COLORS.RESET}`);
 
+  let iter = 1;
   while (true) {
     try {
+      console.log(`\n${ANSI_COLORS.GRAY}[${new Date().toLocaleTimeString()}] [Octavio] Iteración #${iter}...${ANSI_COLORS.RESET}`);
       await runOctavioIteration();
+      iter++;
       
       const currentPnL = await MissionService.getOctavioPnL();
       if (currentPnL >= currentTarget) {

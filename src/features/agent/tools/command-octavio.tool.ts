@@ -7,9 +7,9 @@ import { MissionService } from '../services/mission.service';
 export const commandOctavioSchema = z.object({
   action: z.enum(['START', 'STOP', 'UPDATE']).describe('Acción a tomar sobre Octavio'),
   asset: z.string().optional().describe('Símbolo base del activo a operar opciones (ej. BTC)'),
-  baseCapital: z.coerce.number().optional().describe('Base Imponible sobre la que se calculará el Budget final (ej. si pasas 5000, el Budget real será el 20%: 1000)'),
+  baseCapital: z.coerce.number().optional().describe('Base Imponible sobre la que se calculará el Budget final (ej. si pasas 5000, el Budget real será el 40%: 2000)'),
   resetPnL: z.enum(['true', 'false']).optional().describe('Texto plano "true" o "false". Si es "true", reinicia la alcancía (PnL) a 0.'),
-  budgetMultiplier: z.coerce.number().optional().describe('Multiplicador porcentual para el presupuesto (defecto: 0.2)'),
+  budgetMultiplier: z.coerce.number().optional().describe('Multiplicador porcentual para el presupuesto (defecto: 0.4)'),
   targetMultiplier: z.coerce.number().optional().describe('Multiplicador porcentual para la meta (defecto: 0.1)'),
   directive: z.string().optional().describe('Instrucción táctica del CEO (ej. "Prioriza opciones con Theta bajo y Delta alto").'),
   reason: z.string().describe('Motivo de la decisión en una sola palabra')
@@ -56,7 +56,7 @@ export async function executeCommandOctavio(args: string): Promise<any> {
     let target: number | undefined = undefined;
 
     if (baseCapital !== undefined && baseCapital > 0) {
-      const bMult = budgetMultiplier !== undefined ? budgetMultiplier : 0.2;
+      const bMult = budgetMultiplier !== undefined ? budgetMultiplier : 0.4;
       const tMult = targetMultiplier !== undefined ? targetMultiplier : 0.1;
       
       budget = baseCapital * bMult;

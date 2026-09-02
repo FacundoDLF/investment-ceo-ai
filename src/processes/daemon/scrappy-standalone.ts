@@ -44,7 +44,7 @@ async function startDynamicStandalone() {
 
   const initCycle = async () => {
     const balance = await getUnifiedBalance('bybit');
-    standaloneBudget = balance.cash * 0.5;
+    standaloneBudget = balance.cash * 0.4;
     standaloneTier = 1;
     currentTarget = getTierTarget(standaloneBudget, standaloneTier);
     StateService.setScrappyConfig(true, 'BTCUSDT', standaloneBudget, currentTarget, false);
@@ -54,7 +54,7 @@ async function startDynamicStandalone() {
     console.log(`${ANSI_COLORS.BOLD}  SCRAPPY HFT (Modo Standalone Dinámico)${ANSI_COLORS.RESET}`);
     console.log(`${ANSI_COLORS.MAGENTA}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
     console.log(`  Capital ByBit : $${balance.cash.toFixed(2)}`);
-    console.log(`  Presupuesto   : $${standaloneBudget.toFixed(2)} (50%)`);
+    console.log(`  Presupuesto   : $${standaloneBudget.toFixed(2)} (40%)`);
     console.log(`  Meta Tier 1   : $${currentTarget.toFixed(2)} (5%)`);
     console.log(`  Directiva     : Scalping Algorítmico Agresivo`);
     console.log(`${ANSI_COLORS.MAGENTA}────────────────────────────────────────────────────────────────────────\n${ANSI_COLORS.RESET}`);
@@ -63,9 +63,12 @@ async function startDynamicStandalone() {
   await initCycle();
   console.log(`${ANSI_COLORS.YELLOW}[Sistema] Iniciando demonio dinámico de Scrappy...${ANSI_COLORS.RESET}`);
 
+  let iter = 1;
   while (true) {
     try {
+      console.log(`\n${ANSI_COLORS.GRAY}[${new Date().toLocaleTimeString()}] [Scrappy] Iteración #${iter}...${ANSI_COLORS.RESET}`);
       await runScrappyIteration();
+      iter++;
       
       const currentPnL = await MissionService.getScrappyPnL();
       if (currentPnL >= currentTarget) {

@@ -114,6 +114,46 @@ export class AlpacaAdapter implements IVenueAdapter {
 
     if (!response.ok) {
       const errorText = await response.text();
+      
+      // Auto-retry para el error 403: held_for_orders (acciones atrapadas en orden límite)
+      if (response.status === 403 && errorText.includes('held_for_orders')) {
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.related_orders && Array.isArray(errorData.related_orders)) {
+            console.log(`[Alpaca] 🔄 Liberando ${errorData.related_orders.length} órdenes previas que bloquean la venta de ${params.symbol}...`);
+            for (const orderId of errorData.related_orders) {
+              await fetch(`${baseUrl}/orders/${orderId}`, {
+                method: 'DELETE',
+                headers: {
+                  'APCA-API-KEY-ID': apiKey,
+                  'APCA-API-SECRET-KEY': secretKey,
+                },
+              });
+            }
+            // Pequeña pausa para que Alpaca procese la cancelación
+            await new Promise(res => setTimeout(res, 500));
+            
+            // Reintentar la orden original
+            console.log(`[Alpaca] 🔄 Reintentando la orden principal de ${params.symbol}...`);
+            const retryResponse = await fetch(`${baseUrl}/orders`, {
+              method: 'POST',
+              headers: {
+                'APCA-API-KEY-ID': apiKey,
+                'APCA-API-SECRET-KEY': secretKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload)
+            });
+            if (!retryResponse.ok) {
+               throw new Error(`Alpaca Order API error (Retry): ${retryResponse.status} - ${await retryResponse.text()}`);
+            }
+            return await retryResponse.json();
+          }
+        } catch (parseError: any) {
+          console.warn(`[Alpaca] No se pudo parsear el error 403 para auto-fix: ${parseError.message}`);
+        }
+      }
+
       console.error('❌ Alpaca Order HTTP Error Response:', { status: response.status, statusText: response.statusText, body: errorText });
       throw new Error(`Alpaca Order API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
@@ -196,7 +236,36 @@ export class AlpacaAdapter implements IVenueAdapter {
   }
 
   async cancelAllOrders(symbol: string, category: 'linear' | 'spot' | 'option' = 'linear'): Promise<void> {
-    console.warn(`[Alpaca] cancelAllOrders not implemented yet for ${symbol}`);
+    const apiKey = process.env.ALPACA_API_KEY_ID;
+    const secretKey = process.env.ALPACA_API_SECRET_KEY;
+    const isPaper = process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined;
+    const baseUrl = isPaper ? 'https://paper-api.alpaca.markets/v2' : (process.env.ALPACA_BASE_URL || 'https://api.alpaca.markets/v2');
+
+    if (!apiKey || !secretKey) return;
+
+    try {
+      const response = await fetch(`${baseUrl}/orders?status=open&symbols=${symbol}`, {
+        headers: {
+          'APCA-API-KEY-ID': apiKey,
+          'APCA-API-SECRET-KEY': secretKey,
+        },
+      });
+
+      if (response.ok) {
+        const orders = await response.json();
+        for (const order of orders) {
+          await fetch(`${baseUrl}/orders/${order.id}`, {
+            method: 'DELETE',
+            headers: {
+              'APCA-API-KEY-ID': apiKey,
+              'APCA-API-SECRET-KEY': secretKey,
+            },
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[Alpaca] Error canceling orders for ${symbol}: ${e.message}`);
+    }
   }
 
   async getOptionsChain(baseCoin: string): Promise<any[]> {

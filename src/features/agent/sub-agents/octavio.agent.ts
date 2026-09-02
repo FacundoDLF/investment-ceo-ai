@@ -12,9 +12,9 @@ let lastActionTime = 0;
 
 let currentRotationIndex = 0; // State for multi-asset rotation
 
-export async function runOctavioIteration() {
+export async function runOctavioIteration(): Promise<boolean> {
   const config = StateService.getOctavioState();
-  if (!config.active) return;
+  if (!config.active) return true;
 
   try {
     const currentPnL = await MissionService.getOctavioPnL();
@@ -40,38 +40,81 @@ export async function runOctavioIteration() {
     const baseCoin = baseCoins[currentRotationIndex];
     currentRotationIndex++; // Increment for next iteration
     
-    // Obtener la cadena de opciones
+    // Obtener la cadena de opciones y posiciones en paralelo (I/O optimization)
     let optionsChain: any[] = [];
+    let positions: any[] = [];
     try {
-      optionsChain = await getOptionsChain('bybit', baseCoin);
+      [optionsChain, positions] = await Promise.all([
+        getOptionsChain('bybit', baseCoin),
+        getUnifiedPositions('bybit')
+      ]);
     } catch (e: any) {
-      console.warn(`[Octavio] Error obteniendo Options Chain: ${e.message}`);
-      return;
+      console.warn(`[Octavio] Error de red: ${e.message}`);
+      return true;
     }
-
-    // Obtener posiciones abiertas
-    const positions = await getUnifiedPositions('bybit');
     const myOptionsPositions = positions.filter((p: Position) => p.symbol.includes('-') && p.qty > 0 && p.symbol.startsWith(baseCoin));
 
     const now = Date.now();
     if (myOptionsPositions.length > 0) {
       console.log(`${LOG_PREFIX.OCTAVIO} Monitoreando ${myOptionsPositions.length} posiciones de Opciones activas.`);
-      myOptionsPositions.forEach(p => {
+      let forcedClose = false;
+      for (const p of myOptionsPositions) {
         const isCall = p.symbol.endsWith('-C');
         const typeName = isCall ? 'CALL' : 'PUT';
-        const pnlPctStr = (p.unrealizedPlPc * 100).toFixed(2);
-        const color = p.unrealizedPlPc >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
-        const sign = p.unrealizedPlPc > 0 ? '+' : '';
+        const pnlPct = p.unrealizedPlPc * 100;
+        const pnlPctStr = pnlPct.toFixed(2);
+        const color = pnlPct >= 0 ? ANSI_COLORS.GREEN : ANSI_COLORS.RED;
+        const sign = pnlPct > 0 ? '+' : '';
         console.log(`${LOG_PREFIX.OCTAVIO} Calculando recorrido de ${p.symbol} (${typeName}):`);
         console.log(`  ├─ Entrada : $${p.avgEntryPrice.toFixed(4)}`);
         console.log(`  ├─ Actual  : $${p.currentPrice.toFixed(4)}`);
         console.log(`  └─ Var %   : ${color}${sign}${pnlPctStr}%${ANSI_COLORS.RESET}`);
-      });
+
+        // 🛡️ HARD STOP LOSS EN OPCIONES (-40%)
+        if (pnlPct <= -40.0) {
+           console.log(`\n======================================================`);
+           console.log(`${ANSI_COLORS.RED}💀 [OCTAVIO HARD STOP LOSS] Theta Decay / Drawdown extremo (${pnlPctStr}%). ¡Liquidando ${p.symbol} por Damage Control!${ANSI_COLORS.RESET}`);
+           console.log(`======================================================\n`);
+           
+           await executeOrder('bybit', {
+             symbol: p.symbol,
+             side: p.side === 'buy' ? 'sell' : 'buy',
+             qty: p.qty,
+             type: 'market',
+             category: 'option',
+             reduceOnly: true
+           }).catch(() => {});
+           
+           const realizedPnl = p.unrealizedPl || 0;
+           await MissionService.addOctavioPnL(realizedPnl);
+           await MissionService.addLifetimeOctavioPnL(realizedPnl);
+           
+           await prisma.executionLog.create({
+              data: { eventType: 'OPTION_TRADE_CLOSED', venue: 'bybit', symbol: p.symbol, success: true, details: JSON.stringify({ reason: 'HARD_STOP_LOSS', pnlPct, realizedPnl }) }
+           });
+           forcedClose = true;
+        }
+      }
+      
+      if (forcedClose) return false; // Bypass cooldown if forced close occurred
+
       const targetPct = (config.target / config.budget) * 100;
       const currentPct = (currentPnL / config.budget) * 100;
       console.log(`${ANSI_COLORS.CYAN}  [Resumen] Presupuesto: $${config.budget.toFixed(2)} | Alcancía: $${currentPnL.toFixed(2)} (${currentPct.toFixed(2)}%) | Target: $${config.target.toFixed(2)} (Tier ~${targetPct.toFixed(0)}%)${ANSI_COLORS.RESET}`);
-    } else {
-      console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length}`);
+    } // Cierra if (myOptionsPositions.length > 0)
+
+    // Filtrar contratos inválidos/expirados y ordenar por liquidez
+    const tradableChain = optionsChain
+      .filter(opt => parseFloat(opt.bid1Price || '0') > 0 && parseFloat(opt.ask1Price || '0') > 0)
+      .sort((a, b) => parseFloat(b.volume24h || '0') - parseFloat(a.volume24h || '0'));
+
+    if (myOptionsPositions.length === 0 && tradableChain.length === 0) {
+      console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: 0. Rotando...`);
+      return false; // Bypass cooldown
+    }
+
+    if (myOptionsPositions.length === 0) {
+      console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length} (Filtrados Tradeables: ${tradableChain.length})`);
     }
 
     let directiveText = "";
@@ -83,8 +126,7 @@ export async function runOctavioIteration() {
     }
 
     // Limitar la data que le enviamos al LLM para no volar el context window
-    // Solo enviamos opciones cercanas a expirar (<= 7 días) o las que tengan buen volumen/IV
-    const filteredChain = optionsChain.slice(0, 10).map(opt => ({
+    const filteredChain = tradableChain.slice(0, 10).map(opt => ({
       symbol: opt.symbol,
       bid: opt.bid1Price,
       ask: opt.ask1Price,
@@ -140,12 +182,17 @@ Reglas Críticas:
         
         if (args.action === 'HOLD') {
           console.log(`${LOG_PREFIX.OCTAVIO} HOLD. Razón: ${args.reason || 'Esperando mejor oportunidad'}`);
-          return;
+          return false; // Bypass cooldown para rotar de moneda
         }
 
-        if (now - lastActionTime < 10000) return; // Cooldown 10s
+        if (now - lastActionTime < 10000) return true; // Cooldown 10s
 
-        console.log(`${LOG_PREFIX.OCTAVIO} [Acción] ${args.action} en ${args.symbol}. Razón: ${args.reason}`);
+        console.log(`\n======================================================`);
+        console.log(`${ANSI_COLORS.CYAN}🧠 DECISIÓN ESTRATÉGICA OCTAVIO${ANSI_COLORS.RESET}`);
+        console.log(`  ├─ Acción : ${args.action}`);
+        console.log(`  ├─ Activo : ${args.symbol}`);
+        console.log(`  └─ Razón  : ${args.reason}`);
+        console.log(`======================================================\n`);
 
         try {
           // Validar existencia del contrato 1 ms antes de ejecutar y obtener reglas de lote
@@ -156,10 +203,15 @@ Reglas Críticas:
             instrumentInfo = await m.getInstrumentInfo('bybit', args.symbol);
           } catch (validationErr: any) {
             console.log(`${ANSI_COLORS.YELLOW}⚠️ [Octavio] Contrato inválido o expirado en el Broker: ${validationErr.message}. Abortando orden.${ANSI_COLORS.RESET}`);
-            return;
+            return false; // Skip wait to rotate immediately
           }
           if (args.action === 'OPEN_OPTION') {
             const minQty = instrumentInfo?.minOrderQty || 0.1;
+            
+            console.log(`\n======================================================`);
+            console.log(`${ANSI_COLORS.PINK}[OCTAVIO ATAQUE]${ANSI_COLORS.RESET} 🎯 ¡Entrando a ${args.symbol} (${args.side})!`);
+            console.log(`======================================================\n`);
+            
             await executeOrder('bybit', {
               symbol: args.symbol,
               side: args.side,
@@ -167,9 +219,17 @@ Reglas Críticas:
               type: 'market',
               category: 'option'
             });
+            
+            await prisma.executionLog.create({
+              data: { eventType: 'OPTION_TRADE_OPENED', venue: 'bybit', symbol: args.symbol, success: true, details: JSON.stringify({ side: args.side, reason: args.reason, qty: minQty }) }
+            });
           } else if (args.action === 'CLOSE_OPTION') {
              const posToClose = myOptionsPositions.find(p => p.symbol === args.symbol);
              if (posToClose) {
+               console.log(`\n======================================================`);
+               console.log(`${ANSI_COLORS.GREEN}[OCTAVIO CERRANDO POSICIÓN]${ANSI_COLORS.RESET} 💰 Ejecutando Take Profit / Cierre estratégico en ${args.symbol}!`);
+               console.log(`======================================================\n`);
+               
                await executeOrder('bybit', {
                  symbol: args.symbol,
                  side: posToClose.side === 'buy' ? 'sell' : 'buy', // En opciones bybit, cerrar una posición es enviar orden contraria con reduceOnly
@@ -182,6 +242,10 @@ Reglas Críticas:
                const realizedPnl = posToClose.unrealizedPl || 0;
                await MissionService.addOctavioPnL(realizedPnl);
                await MissionService.addLifetimeOctavioPnL(realizedPnl);
+               
+               await prisma.executionLog.create({
+                  data: { eventType: 'OPTION_TRADE_CLOSED', venue: 'bybit', symbol: args.symbol, success: true, details: JSON.stringify({ reason: args.reason, realizedPnl }) }
+               });
              }
           }
           lastActionTime = now;
@@ -194,4 +258,5 @@ Reglas Críticas:
   } catch (error: any) {
     // Fail silently in loop
   }
+  return true;
 }

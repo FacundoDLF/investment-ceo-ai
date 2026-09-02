@@ -50,7 +50,6 @@ export class StateService {
     }
 
     if (target && target > 0) this.scrappyTarget = target;
-    console.log(`[StateService] Scrappy Config Actualizada: Activo=${this.scrappyActive}, Asset=${this.scrappyTargetAsset}, Budget=${this.scrappyBudget}, Target=${this.scrappyTarget}, AutoResetPnL=${this.scrappyAutoResetPnL}`);
   }
 
   static getScrappyDirective(): string | null {
@@ -87,7 +86,6 @@ export class StateService {
     }
 
     if (target && target > 0) this.octavioTarget = target;
-    console.log(`[StateService] Octavio Config Actualizada: Activo=${this.octavioActive}, Asset=${this.octavioTargetAsset}, Budget=${this.octavioBudget}, Target=${this.octavioTarget}, AutoResetPnL=${this.octavioAutoResetPnL}`);
   }
 
   static getOctavioDirective(): string | null {

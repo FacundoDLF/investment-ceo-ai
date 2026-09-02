@@ -4,8 +4,8 @@ import { getUnifiedBalance } from '@/features/venues/venue.service';
 import { runOctavioIteration } from '@/features/agent/sub-agents/octavio.agent';
 import { ANSI_COLORS } from '@/shared/constants/colors';
 
-// Configuración inicial base
-StateService.setOctavioConfig(true, 'BTCUSDT', 0, 0, false);
+// Configuración inicial base (Rotación de las 3 disponibles en opciones de ByBit)
+StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT', 0, 0, false);
 
 const octavioAscii = `${ANSI_COLORS.LIME_GREEN}${ANSI_COLORS.BOLD}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -46,7 +46,7 @@ async function startDynamicStandalone() {
     standaloneBudget = balance.cash * 0.5;
     standaloneTier = 1;
     currentTarget = getTierTarget(standaloneBudget, standaloneTier);
-    StateService.setOctavioConfig(true, 'BTCUSDT', standaloneBudget, currentTarget, false);
+    StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT', standaloneBudget, currentTarget, false);
     
     console.log(octavioAscii);
     console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
@@ -55,6 +55,7 @@ async function startDynamicStandalone() {
     console.log(`  Capital ByBit : $${balance.cash.toFixed(2)}`);
     console.log(`  Presupuesto   : $${standaloneBudget.toFixed(2)} (50%)`);
     console.log(`  Meta Tier 1   : $${currentTarget.toFixed(2)} (5%)`);
+    console.log(`  Target Assets : ROTACIÓN (BTC, ETH, SOL)`);
     console.log(`  Directiva     : Análisis de Griegas y Caza de Primas`);
     console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────\n${ANSI_COLORS.RESET}`);
   };
@@ -78,14 +79,14 @@ async function startDynamicStandalone() {
         } else {
           standaloneTier++;
           currentTarget = getTierTarget(standaloneBudget, standaloneTier);
-          StateService.setOctavioConfig(true, 'BTCUSDT', standaloneBudget, currentTarget, false);
+          StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT', standaloneBudget, currentTarget, false);
           console.log(`\n${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}🚀 [STANDALONE] ¡Tier completado! Subiendo a Tier ${standaloneTier}... Nueva Meta: $${currentTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
         }
       }
     } catch (error: any) {
       // Ignore silence errors
     }
-    await new Promise(resolve => setTimeout(resolve, 20000)); // Octavio corre cada 20s
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Octavio rota cada 5s
   }
 }
 

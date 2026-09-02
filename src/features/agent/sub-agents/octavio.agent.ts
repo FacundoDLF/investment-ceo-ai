@@ -12,6 +12,8 @@ let lastLogTime = 0;
 let lastHeartbeatTime = 0;
 let lastActionTime = 0;
 
+let currentRotationIndex = 0; // State for multi-asset rotation
+
 export async function runOctavioIteration() {
   const config = StateService.getOctavioState();
   if (!config.active) return;
@@ -26,7 +28,19 @@ export async function runOctavioIteration() {
       }
     }
 
-    const baseCoin = config.targetAsset.replace('USDT', '').replace('USDC', ''); // ej. BTC
+    const rawAsset = config.targetAsset;
+    let baseCoins: string[] = [];
+    
+    if (rawAsset.includes(',')) {
+      baseCoins = rawAsset.split(',').map(s => s.replace('USDT', '').replace('USDC', '').trim());
+    } else {
+      baseCoins = [rawAsset.replace('USDT', '').replace('USDC', '').trim()]; // ej. BTC
+    }
+    
+    // Rotate to the next coin
+    if (currentRotationIndex >= baseCoins.length) currentRotationIndex = 0;
+    const baseCoin = baseCoins[currentRotationIndex];
+    currentRotationIndex++; // Increment for next iteration
     
     // Obtener la cadena de opciones
     let optionsChain: any[] = [];

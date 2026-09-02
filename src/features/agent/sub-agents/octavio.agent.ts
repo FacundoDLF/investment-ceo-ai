@@ -8,8 +8,6 @@ import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
 import type { Position } from '@/shared/interfaces/venue.adapter';
 import { cancelAllOrders, getUnifiedPositions } from '@/features/venues/venue.service';
 
-let lastLogTime = 0;
-let lastHeartbeatTime = 0;
 let lastActionTime = 0;
 
 let currentRotationIndex = 0; // State for multi-asset rotation
@@ -56,13 +54,10 @@ export async function runOctavioIteration() {
     const myOptionsPositions = positions.filter((p: Position) => p.symbol.includes('-') && p.qty > 0 && p.symbol.startsWith(baseCoin));
 
     const now = Date.now();
-    if (now - lastLogTime > 30000) {
-      if (myOptionsPositions.length > 0) {
-        console.log(`${LOG_PREFIX.OCTAVIO} Monitoreando ${myOptionsPositions.length} posiciones de Opciones activas.`);
-      } else {
-        console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length}`);
-      }
-      lastLogTime = now;
+    if (myOptionsPositions.length > 0) {
+      console.log(`${LOG_PREFIX.OCTAVIO} Monitoreando ${myOptionsPositions.length} posiciones de Opciones activas.`);
+    } else {
+      console.log(`${LOG_PREFIX.OCTAVIO} Escaneando opciones de ${baseCoin}. Contratos disponibles: ${optionsChain.length}`);
     }
 
     let directiveText = "";
@@ -130,11 +125,8 @@ Reglas Críticas:
         const args = JSON.parse(tc.function.arguments);
         
         if (args.action === 'HOLD') {
-           if (now - lastHeartbeatTime > 30000) {
-             console.log(`${LOG_PREFIX.OCTAVIO} HOLD. Razón: ${args.reason || 'Esperando mejor oportunidad'}`);
-             lastHeartbeatTime = now;
-           }
-           return;
+          console.log(`${LOG_PREFIX.OCTAVIO} HOLD. Razón: ${args.reason || 'Esperando mejor oportunidad'}`);
+          return;
         }
 
         if (now - lastActionTime < 10000) return; // Cooldown 10s
@@ -142,6 +134,14 @@ Reglas Críticas:
         console.log(`${LOG_PREFIX.OCTAVIO} [Acción] ${args.action} en ${args.symbol}. Razón: ${args.reason}`);
 
         try {
+          // Validar existencia del contrato 1 ms antes de ejecutar
+          console.log(`${LOG_PREFIX.OCTAVIO} Validando estado del contrato ${args.symbol} en el broker...`);
+          try {
+            await import('@/features/venues/venue.service').then(m => m.getInstrumentInfo('bybit', args.symbol));
+          } catch (validationErr: any) {
+            console.log(`${ANSI_COLORS.YELLOW}⚠️ [Octavio] Contrato inválido o expirado en el Broker: ${validationErr.message}. Abortando orden.${ANSI_COLORS.RESET}`);
+            return;
+          }
           if (args.action === 'OPEN_OPTION') {
             // Lógica simplificada de qty (1 contrato para empezar)
             await executeOrder('bybit', {

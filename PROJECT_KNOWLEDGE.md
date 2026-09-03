@@ -69,7 +69,18 @@
 * **Contexto:** El CEO intentaba cerrar una posición Long perdedora durante el MODO DAMAGE CONTROL.
 * **Problema:** En el Hedge Mode de Bybit, para cerrar una posición no basta con enviar una orden contraria; Bybit cree que quieres ABRIR una nueva posición en la dirección opuesta (y falla si no tienes saldo libre).
 * **Solución:** En `bybit.adapter.ts` y en `close-position.tool.ts` se implementó explícitamente el uso de la bandera `reduceOnly: true`. Además, la lógica del `positionIdx` en el adapter se invirtió para cierres: al cerrar un Long (vendiendo con reduceOnly), debes enviar `positionIdx = 1`. Al cerrar un Short (comprando con reduceOnly), debes enviar `positionIdx = 2`.
+* **Regla a futuro:** **Nunca asumir que un broker devuelve saldos por defecto.** Si falta la autenticación, el script **DEBE** detenerse con un `process.exit(1)` ruidoso. No envolver la inicialización con un try-catch silencioso que retorne arreglos vacíos.
 * **REGLA:** Siempre que diseñes herramientas o adapters para CERRAR posiciones en Hedge Mode, DEBES incluir `reduceOnly: true` en la carga útil y cruzar la orden apuntando al `positionIdx` de la posición original que intentas reducir.
+
+### [ISSUE] Alucinación Arquitectónica: IOL no soporta MCP
+* **Problema:** El adaptador original de IOL (`iol.adapter.ts`) intentaba conectarse a un servidor MCP ficticio (`mcp.invertironline.com`) utilizando el SDK `@modelcontextprotocol/sdk`. Como el servidor no existía, devolvía `SSE error: Non-200 status code (404)`.
+* **Solución:** Se demolió la integración falsa (`iol.mcp.ts`) y se construyó un cliente API REST estándar (`iol.api.ts`) que consume los endpoints V2 reales de InvertirOnline (`/api/v2/estadocuenta` y `/api/v2/portafolio/argentina`) mediante `fetch`.
+* **Regla a futuro:** **MANDATORY**: InvertirOnline (IOL) **NO POSEE** ni soporta el protocolo MCP (Model Context Protocol). Toda integración con este broker argentino **debe** realizarse a través de llamadas HTTP estándar a su API REST V2 (`api.invertironline.com`). No intentar inventar servidores de streaming para brokers clásicos.
+
+### [ISSUE] Bybit API Error: The contract is not available for trades.
+* **Contexto:** Octavio HFT intenta abrir una posición en un contrato de Opciones (ej. MNT-3SEP26-0.55-C).
+* **Problema:** El broker devuelve este error cuando el contrato específico está en fase de liquidación (delivery), tiene la negociación suspendida, o pertenece a un activo subyacente que no está plenamente habilitado para operar en la subcuenta del usuario a pesar de listar cotizaciones.
+* **Solución (Implementada):** El sistema captura el error de forma limpia en la fase de validación de la orden, cancela la ejecución para no bloquear el HFT, imprime un warning `⚠️ [Octavio] Contrato inválido o expirado en el Broker` y avanza a la siguiente iteración de escaneo.
 
 ### [ISSUE] Bybit API Error: orderLinkId can not be empty (Opciones)
 
@@ -135,4 +146,57 @@
 * **Contexto:** El CEO intentaba cerrar una posición de acciones en Alpaca (ej. SPY) utilizando la herramienta `close_position`.
 * **Problema:** Alpaca devolvía `403 Forbidden` con el mensaje `insufficient qty available for order... held_for_orders`. Esto ocurre porque las acciones que el CEO intentaba vender ya estaban comprometidas ("held") en otra orden abierta (por ejemplo, una orden límite de Take Profit o Stop Loss colocada previamente). En Alpaca, no puedes vender a mercado acciones que ya tienen una orden de venta pendiente.
 * **Solución:** Se implementó el método `cancelAllOrders` en `alpaca.adapter.ts` (que hace un `DELETE` a las órdenes abiertas del símbolo), y se modificó `close-position.tool.ts` para invocar este método siempre antes de ejecutar la orden Market de cierre.
-* **REGLA:** Siempre que intentes cerrar una posición de forma programática (Market Order), debes cancelar TODAS las órdenes abiertas de ese símbolo (`cancelAllOrders`) para liberar la liquidez/acciones comprometidas.
+* **REGLA:** Siempre que intentes cerrar una posición de forma programática (Market Order), debes cancelar TODAS las órdenes abiertas de ese símbolo (`cancelAllOrders`) para liberar la liquidez/acciones comprometidas.
+
+### [ISSUE] Error 401 Unauthorized y Ejecución Ficticia en IOL (MCP)
+
+* **Contexto:** Al integrar IOL Inversiones usando el Model Context Protocol (MCP), el servidor requiere un Token OAuth 2.0.
+* **Problema:** Si el usuario arrancaba el sistema (`npm run ceo:iol`) sin configurar el `IOL_ACCESS_TOKEN` en su `.env`, la conexión SSE arrojaba un error 401. El sistema lo atrapaba, ponía los saldos en $0 y continuaba con la ejecución de toda la cadena de IAs, gastando tokens inútilmente y tomando decisiones (ej: Auditoría Limpia) sobre una cuenta desconectada.
+* **Solución:** En el archivo de arranque principal (`ceo.loop.ts`), se añadió un **Hard-Stop**. Si el daemon es invocado en modo `iol` y no detecta `process.env.IOL_ACCESS_TOKEN`, imprime un cartel rojo gigante ("ERROR FATAL: FALTA TOKEN DE IOL") y ejecuta `process.exit(1)` interrumpiendo el flujo antes de instanciar al CEO Trader.
+* **REGLA:** NUNCA permitas que el sistema asuma silenciosamente un saldo de $0 si la conexión principal (API o MCP) falla por autenticación. Aplica un Hard-Stop inmediato y exige al usuario que configure sus credenciales para no generar "ejecuciones fantasmas".
+
+---
+
+## 4. Referencia de Endpoints (IOL API V2)
+
+Para futuras expansiones (como Trading de Bonos, Cauciones, FCI, o endpoints específicos de cotización), aquí documentamos los endpoints descubiertos de la API V2 de InvertirOnline. **Nota:** Los agentes de IA (CEO/Octavio) no usan esta lista en tiempo real, operan ciegos a través de las tools. Esta lista es exclusiva para nosotros (los ingenieros y desarrolladores IA) como mapa de ruta.
+
+### Autenticación y Perfil
+- `POST /token` (OAuth 2.0 password grant)
+- `GET /api/v2/datos-perfil`
+- `GET /api/v2/Notificacion`
+
+### Estado de Cuenta y Portafolio
+- `GET /api/v2/estadocuenta` (Muestra saldos líquidos y comprometidos)
+- `GET /api/v2/portafolio/{pais}` (Muestra tenencias/activos. `pais` usualmente `argentina`)
+- `GET /api/v2/operaciones` (Historial)
+- `GET /api/v2/operaciones/{numero}`
+- `DELETE /api/v2/operaciones/{numero}`
+
+### Cotizaciones y Títulos
+- `GET /api/v2/{mercado}/Titulos/{simbolo}`
+- `GET /api/v2/{mercado}/Titulos/{simbolo}/Cotizacion`
+- `GET /api/v2/{mercado}/Titulos/{simbolo}/CotizacionDetalle`
+- `GET /api/v2/{mercado}/Titulos/{simbolo}/Opciones` (Cadena de opciones)
+- `GET /api/v2/{mercado}/Titulos/{simbolo}/Cotizacion/seriehistorica/{fechaDesde}/{fechaHasta}/{ajustada}`
+- `GET /api/v2/Cotizaciones/MEP` y `GET /api/v2/Cotizaciones/MEP/{simbolo}`
+- `GET /api/v2/{pais}/Titulos/Cotizacion/Instrumentos`
+- `GET /api/v2/Titulos/FCI` (Fondos Comunes de Inversión)
+
+### Ejecución de Órdenes (Operar)
+- `POST /api/v2/operar/Comprar`
+- `POST /api/v2/operar/Vender`
+- `POST /api/v2/operar/CPD` (Cauciones)
+- `POST /api/v2/operar/suscripcion/fci`
+- `POST /api/v2/operar/rescate/fci`
+
+---
+
+## 5. Horarios de Mercado y Finanzas Tradicionales
+
+### [ISSUE] Alpaca API Error 422: options market orders are only allowed during market hours
+
+* **Contexto:** El sub-agente Octavio intentó abrir una posición en un contrato de opciones tradicionales (ej. VIX o SPX) en Alpaca enviando una orden tipo `market`.
+* **Problema:** Alpaca rechaza las órdenes de mercado (`market orders`) para opciones si el mercado bursátil estadounidense está cerrado (After-Hours o Pre-Market), devolviendo el error HTTP 422: `options market orders are only allowed during market hours`.
+* **Solución (Comportamiento actual):** El error es capturado limpiamente por el bloque `try/catch` de Octavio. El demonio imprime el error, anula el trade para evitar bloqueos y simplemente rota al siguiente activo (ej. BTC que opera 24/7).
+* **REGLA:** Es un comportamiento normal y esperado si el bot opera de madrugada en activos tradicionales. Para evitar el error en el futuro, el sistema simplemente descarta la operación fuera de horario y continúa iterando, no se requiere acción manual salvo que se desee operar activamente de día.

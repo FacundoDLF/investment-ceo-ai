@@ -4,8 +4,18 @@ import { getUnifiedBalance } from '@/features/venues/venue.service';
 import { runOctavioIteration } from '@/features/agent/sub-agents/octavio.agent';
 import { ANSI_COLORS } from '@/shared/constants/colors';
 
-// Configuración inicial base (Rotación masiva de opciones ByBit)
-StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', 0, 0, false);
+const DAEMON_START_TIME = Date.now();
+function formatUptime(): string {
+  const diff = Math.floor((Date.now() - DAEMON_START_TIME) / 1000);
+  const d = Math.floor(diff / (3600 * 24));
+  const h = Math.floor((diff % (3600 * 24)) / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
+
+// Configuración inicial base (Rotación masiva de opciones ByBit + Alpaca)
+StateService.setOctavioConfig(true, 'SPX,VIX,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', 0, 0, false);
 
 const octavioAscii = `${ANSI_COLORS.LIME_GREEN}${ANSI_COLORS.BOLD}
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -42,20 +52,26 @@ async function startDynamicStandalone() {
   let currentTarget = 0;
 
   const initCycle = async () => {
-    const balance = await getUnifiedBalance('bybit');
-    standaloneBudget = balance.cash * 0.4;
+    const bybitBal = await getUnifiedBalance('bybit');
+    const alpacaBal = await getUnifiedBalance('alpaca');
+    
+    const bybitBudget = bybitBal.cash * 0.4;
+    const alpacaBudget = alpacaBal.cash * 0.4;
+    standaloneBudget = bybitBudget + alpacaBudget;
+    
     standaloneTier = 1;
     currentTarget = getTierTarget(standaloneBudget, standaloneTier);
-    StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', standaloneBudget, currentTarget, false);
+    StateService.setOctavioConfig(true, 'SPX,VIX,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', standaloneBudget, currentTarget, false);
     
     console.log(octavioAscii);
     console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
-    console.log(`${ANSI_COLORS.BOLD}  OCTAVIO HFT OPTIONS (Modo Standalone Dinámico)${ANSI_COLORS.RESET}`);
+    console.log(`${ANSI_COLORS.BOLD}  OCTAVIO HFT OPTIONS (Modo Standalone Multi-Venue)${ANSI_COLORS.RESET}`);
     console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────${ANSI_COLORS.RESET}`);
-    console.log(`  Capital ByBit : $${balance.cash.toFixed(2)}`);
-    console.log(`  Presupuesto   : $${standaloneBudget.toFixed(2)} (40%)`);
+    console.log(`  Capital ByBit : $${bybitBal.cash.toFixed(2)} (Bdg: $${bybitBudget.toFixed(2)})`);
+    console.log(`  Capital Alpaca: $${alpacaBal.cash.toFixed(2)} (Bdg: $${alpacaBudget.toFixed(2)})`);
+    console.log(`  Presupuesto Total: $${standaloneBudget.toFixed(2)}`);
     console.log(`  Meta Tier 1   : $${currentTarget.toFixed(2)} (5%)`);
-    console.log(`  Target Assets : ROTACIÓN MASIVA (8 Monedas)`);
+    console.log(`  Target Assets : ROTACIÓN MASIVA (10 Índices/Monedas)`);
     console.log(`  Directiva     : Análisis de Griegas y Caza de Primas`);
     console.log(`${ANSI_COLORS.CYAN}────────────────────────────────────────────────────────────────────────\n${ANSI_COLORS.RESET}`);
   };
@@ -66,7 +82,7 @@ async function startDynamicStandalone() {
   let iter = 1;
   while (true) {
     try {
-      console.log(`\n${ANSI_COLORS.GRAY}[${new Date().toLocaleTimeString()}] [Octavio] Iteración #${iter}...${ANSI_COLORS.RESET}`);
+      console.log(`\n${ANSI_COLORS.GRAY}[${new Date().toLocaleTimeString()}] [Octavio] Iteración #${iter} | Running: ${formatUptime()}...${ANSI_COLORS.RESET}`);
       await runOctavioIteration();
       iter++;
       
@@ -82,7 +98,7 @@ async function startDynamicStandalone() {
         } else {
           standaloneTier++;
           currentTarget = getTierTarget(standaloneBudget, standaloneTier);
-          StateService.setOctavioConfig(true, 'BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', standaloneBudget, currentTarget, false);
+          StateService.setOctavioConfig(true, 'SPX,VIX,BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,MNTUSDT,XAUTUSDT,HYPEUSDT', standaloneBudget, currentTarget, false);
           console.log(`\n${ANSI_COLORS.CYAN}${ANSI_COLORS.BOLD}🚀 [STANDALONE] ¡Tier completado! Subiendo a Tier ${standaloneTier}... Nueva Meta: $${currentTarget.toFixed(2)}${ANSI_COLORS.RESET}\n`);
         }
       }

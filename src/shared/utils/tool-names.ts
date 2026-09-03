@@ -13,7 +13,8 @@ export const TOOL_NAMES_ES: Record<string, string> = {
   serper_search: "Actualizando noticias y novedades...",
   tavily_research: "Iniciando investigación profunda...",
   calculate_risk_size: "Calculando Tamaño de Riesgo (Kelly Criterion)",
-  get_crypto_sentiment: "Leyendo Sentimiento del Mercado Crypto (Fear & Greed)..."
+  get_crypto_sentiment: "Leyendo Sentimiento del Mercado Crypto (Fear & Greed)...",
+  analyze_options_sentiment: "Leyendo flujo institucional de Opciones (Put/Call Ratio)..."
 };
 
 export function getFriendlyToolName(toolName: string): string {

@@ -360,9 +360,15 @@ async function executeScalpAction(
         postOnly: true
       }).catch((e) => { 
         console.log(`${LOG_PREFIX.SCRAPPY} ${ANSI_COLORS.RED}Error abriendo posición: ${e.message}${ANSI_COLORS.RESET}`);
+        if (e.message.includes('ab not enough')) {
+          console.log(`${LOG_PREFIX.SCRAPPY} ${ANSI_COLORS.YELLOW}💡 Tu Margen Disponible (Available Balance) actual en Bybit es insuficiente para abrir una posición de $${orderValue.toFixed(2)}. Puede que tus fondos estén en Spot/Earn o bloqueados en otras posiciones. Pausando intentos por 60s...${ANSI_COLORS.RESET}`);
+          lastActionTime = Date.now() + 60000; // Cooldown extendido
+        }
       });
 
-      lastActionTime = now;
+      if (!lastActionTime || lastActionTime <= now) {
+         lastActionTime = Date.now();
+      }
     }
   } catch (e: any) {
     // Fail silently in HFT loop unless it's a critical error

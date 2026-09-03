@@ -1,0 +1,278 @@
+{
+  "pais": "argentina",
+  "activos": [
+    {
+      "cantidad": 18,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 1.39,
+      "ultimoPrecio": 34840,
+      "ppc": 30096.193,
+      "gananciaPorcentaje": 15.76,
+      "gananciaDinero": 85388.52,
+      "valorizado": 627120,
+      "titulo": {
+        "simbolo": "B",
+        "descripcion": "Cedear Barrick Mining Corporation",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 1,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.57,
+      "ultimoPrecio": 21080,
+      "ppc": 19410,
+      "gananciaPorcentaje": 8.6,
+      "gananciaDinero": 1670,
+      "valorizado": 21080,
+      "titulo": {
+        "simbolo": "CVX",
+        "descripcion": "Cedear Chevron Corp.",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 2,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.85,
+      "ultimoPrecio": 42340,
+      "ppc": 42590,
+      "gananciaPorcentaje": -0.58,
+      "gananciaDinero": -500,
+      "valorizado": 84680,
+      "titulo": {
+        "simbolo": "DIA",
+        "descripcion": "Cedear Spdr Dow Jones Industrial",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 22,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 1.66,
+      "ultimoPrecio": 12850,
+      "ppc": 12390.105,
+      "gananciaPorcentaje": 3.71,
+      "gananciaDinero": 10117.68,
+      "valorizado": 282700,
+      "titulo": {
+        "simbolo": "GLD",
+        "descripcion": "Cedear Etf Spdr Gold Trust",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 1,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 1.24,
+      "ultimoPrecio": 29200,
+      "ppc": 27480,
+      "gananciaPorcentaje": 6.25,
+      "gananciaDinero": 1720,
+      "valorizado": 29200,
+      "titulo": {
+        "simbolo": "JNJ",
+        "descripcion": "Cedear Johnson & Johnson",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 1,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.85,
+      "ultimoPrecio": 28240,
+      "ppc": 27420,
+      "gananciaPorcentaje": 2.99,
+      "gananciaDinero": 820,
+      "valorizado": 28240,
+      "titulo": {
+        "simbolo": "KO",
+        "descripcion": "Cedear The Coca Cola Company",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 1,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": -0.82,
+      "ultimoPrecio": 26320,
+      "ppc": 26520,
+      "gananciaPorcentaje": -0.75,
+      "gananciaDinero": -200,
+      "valorizado": 26320,
+      "titulo": {
+        "simbolo": "MSFT",
+        "descripcion": "Cedear Microsoft Corp.",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 5,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.8,
+      "ultimoPrecio": 7560,
+      "ppc": 7575,
+      "gananciaPorcentaje": -0.19,
+      "gananciaDinero": -75,
+      "valorizado": 37800,
+      "titulo": {
+        "simbolo": "O",
+        "descripcion": "Cedear Realty Income Corp.",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 2,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 2.38,
+      "ultimoPrecio": 11570,
+      "ppc": 10520,
+      "gananciaPorcentaje": 9.98,
+      "gananciaDinero": 2100,
+      "valorizado": 23140,
+      "titulo": {
+        "simbolo": "PFE",
+        "descripcion": "Cedear Pfizer Inc.",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 6,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 1.35,
+      "ultimoPrecio": 15710,
+      "ppc": 15348.371,
+      "gananciaPorcentaje": 2.35,
+      "gananciaDinero": 2169.78,
+      "valorizado": 94260,
+      "titulo": {
+        "simbolo": "PG",
+        "descripcion": "Cedear Procter & Gamble",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 2,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.14,
+      "ultimoPrecio": 13820,
+      "ppc": 12850,
+      "gananciaPorcentaje": 7.54,
+      "gananciaDinero": 1940,
+      "valorizado": 27640,
+      "titulo": {
+        "simbolo": "T",
+        "descripcion": "Cedear At & T Inc.",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 473,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.4,
+      "ultimoPrecio": 169550,
+      "ppc": 155153.736,
+      "gananciaPorcentaje": 9.27,
+      "gananciaDinero": 68094.33,
+      "valorizado": 801971.5,
+      "titulo": {
+        "simbolo": "VSCRO",
+        "descripcion": "On Vista Energy Cl.26 Vto. 10/10/31 U$S",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "ObligacionesNegociables",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    },
+    {
+      "cantidad": 32,
+      "comprometido": 0,
+      "puntosVariacion": 0,
+      "variacionDiaria": 0.15,
+      "ultimoPrecio": 26200,
+      "ppc": 18486.909,
+      "gananciaPorcentaje": 41.72,
+      "gananciaDinero": 246818.91,
+      "valorizado": 838400,
+      "titulo": {
+        "simbolo": "XOM",
+        "descripcion": "Cedear Exxon Mobil Corporation",
+        "pais": "argentina",
+        "mercado": "bcba",
+        "tipo": "CEDEARS",
+        "plazo": "t1",
+        "moneda": "peso_Argentino"
+      },
+      "parking": null
+    }
+  ]
+}

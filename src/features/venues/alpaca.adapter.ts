@@ -42,9 +42,10 @@ export class AlpacaAdapter implements IVenueAdapter {
   async getInstrumentInfo(symbol: string): Promise<{ qtyStep: number; minOrderQty: number }> {
     // Alpaca usa acciones fraccionarias para stocks (0.0001) y crypto (0.0001).
     // Devolvemos valores seguros genéricos.
+    const isOption = symbol.length > 8 && /\d/.test(symbol);
     return {
-      qtyStep: 0.0001,
-      minOrderQty: 0.0001
+      qtyStep: isOption ? 1 : 0.0001,
+      minOrderQty: isOption ? 1 : 0.0001
     };
   }
 
@@ -273,12 +274,13 @@ export class AlpacaAdapter implements IVenueAdapter {
     const secretKey = process.env.ALPACA_API_SECRET_KEY;
     const isPaper = process.env.PAPER_MODE_ONLY === 'true' || process.env.PAPER_MODE_ONLY === undefined;
     const baseUrl = isPaper ? 'https://paper-api.alpaca.markets/v2' : (process.env.ALPACA_BASE_URL || 'https://api.alpaca.markets/v2');
+    const dataUrl = process.env.ALPACA_DATA_URL || 'https://data.alpaca.markets/v1beta1/options';
 
     if (!apiKey || !secretKey) {
       throw new Error('Alpaca API credentials missing');
     }
 
-    // Usar underlying_symbols
+    // 1. Obtener contratos activos (limit 50)
     const response = await fetch(`${baseUrl}/options/contracts?underlying_symbols=${baseCoin}&limit=50&status=active`, {
       headers: {
         'APCA-API-KEY-ID': apiKey,
@@ -287,11 +289,54 @@ export class AlpacaAdapter implements IVenueAdapter {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Alpaca Options API error: ${response.status} - ${errorText}`);
+      throw new Error(`Alpaca Options API error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.option_contracts || [];
+    const contracts = data.option_contracts || [];
+    
+    if (contracts.length === 0) return [];
+
+    // 2. Obtener snapshots (precios y griegas) para esos contratos
+    const symbols = contracts.map((c: any) => c.symbol).join(',');
+    let snapshots: any = {};
+    
+    try {
+      const snapResponse = await fetch(`${dataUrl}/snapshots?symbols=${symbols}`, {
+        headers: {
+          'APCA-API-KEY-ID': apiKey,
+          'APCA-API-SECRET-KEY': secretKey,
+        },
+      });
+      if (snapResponse.ok) {
+        const snapData = await snapResponse.json();
+        snapshots = snapData.snapshots || {};
+      }
+    } catch (e) {
+      console.warn('[Alpaca] No se pudieron obtener quotes de opciones:', e);
+    }
+
+    // 3. Mapear al formato unificado (Similar a Bybit)
+    return contracts.map((c: any) => {
+      const snap = snapshots[c.symbol];
+      const quote = snap?.latestQuote || {};
+      const greeks = snap?.impliedVolatility || {};
+      
+      return {
+        symbol: c.symbol,
+        bid1Price: quote.bp ? quote.bp.toString() : '0',
+        ask1Price: quote.ap ? quote.ap.toString() : '0',
+        markIv: greeks ? greeks.toString() : '0',
+        delta: '0', // Alpaca API en beta puede no devolver griegas completas
+        gamma: '0',
+        theta: '0',
+        vega: '0',
+        volume24h: snap?.volume ? snap.volume.toString() : '0',
+        // Info extra para el LLM
+        strike: c.strike_price,
+        type: c.type,
+        expiry: c.expiration_date
+      };
+    });
   }
 }

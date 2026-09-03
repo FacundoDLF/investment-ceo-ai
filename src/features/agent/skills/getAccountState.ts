@@ -16,15 +16,20 @@ export const getAccountStateTool: ChatCompletionTool = {
 };
 
 export async function executeGetAccountState() {
-  const [alpacaBalance, bybitBalance, challenges, alpacaPositions, bybitPositions, dbPositions, lastSnapshot] = await Promise.all([
-    getUnifiedBalance('alpaca').catch((e) => {
+  const isIol = process.env.CEO_MODE === 'iol';
+  const isCrypto = process.env.CEO_MODE === 'crypto';
+  const isNormal = !isIol && !isCrypto;
+
+  const [alpacaBalance, bybitBalance, iolBalance, challenges, alpacaPositions, bybitPositions, iolPositions, dbPositions, lastSnapshot] = await Promise.all([
+    (isNormal) ? getUnifiedBalance('alpaca').catch((e) => {
       console.warn('Error obteniendo balance de Alpaca:', e.message);
       return null;
-    }),
-    getUnifiedBalance('bybit').catch((e) => {
+    }) : Promise.resolve(null),
+    (isNormal || isCrypto) ? getUnifiedBalance('bybit').catch((e) => {
       console.warn('Error obteniendo balance de Bybit:', e.message);
       return null;
-    }),
+    }) : Promise.resolve(null),
+    (isIol) ? getUnifiedBalance('iol') : Promise.resolve(null),
     prisma.challenge.findMany({
       where: {
         status: 'ACTIVE',
@@ -34,19 +39,20 @@ export async function executeGetAccountState() {
         targetMetric: true,
       },
     }),
-    getUnifiedPositions('alpaca').catch((e) => {
+    (isNormal) ? getUnifiedPositions('alpaca').catch((e) => {
       console.warn('Error obteniendo posiciones de Alpaca:', e.message);
       return [];
-    }),
-    getUnifiedPositions('bybit').catch((e) => {
+    }) : Promise.resolve([]),
+    (isNormal || isCrypto) ? getUnifiedPositions('bybit').catch((e) => {
       console.warn('Error obteniendo posiciones de Bybit:', e.message);
       return [];
-    }),
+    }) : Promise.resolve([]),
+    (isIol) ? getUnifiedPositions('iol') : Promise.resolve([]),
     prisma.position.findMany(), // Obtener estrategias guardadas
     prisma.performanceSnapshot.findFirst({ orderBy: { timestamp: 'desc' } })
   ]);
 
-  const totalCash = (alpacaBalance?.cash ?? 0) + (bybitBalance?.cash ?? 0);
+  const totalCash = (alpacaBalance?.cash ?? 0) + (bybitBalance?.cash ?? 0) + (iolBalance?.cash ?? 0);
 
   // Mapear estrategias a posiciones vivas
   const getPositionMeta = (venue: string, symbol: string) => {
@@ -59,16 +65,19 @@ export async function executeGetAccountState() {
 
   const enrichedAlpaca = alpacaPositions.map(p => ({ ...p, ...getPositionMeta('alpaca', p.symbol) }));
   const enrichedBybit = bybitPositions.map(p => ({ ...p, ...getPositionMeta('bybit', p.symbol) }));
+  const enrichedIol = iolPositions.map(p => ({ ...p, ...getPositionMeta('iol', p.symbol) }));
 
   return {
     consolidatedBalance: {
       totalCash,
       alpaca: alpacaBalance,
       bybit: bybitBalance,
+      iol: iolBalance
     },
     positions: {
       alpaca: enrichedAlpaca,
       bybit: enrichedBybit,
+      iol: enrichedIol
     },
     challenges,
     scrappyState: StateService.getScrappyState(),

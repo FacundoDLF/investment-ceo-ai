@@ -17,8 +17,16 @@ export async function runOctavioIteration(): Promise<boolean> {
   if (!config.active) return true;
 
   try {
+    const isIol = process.env.CEO_MODE === 'iol';
+    const isAdvisorMode = isIol && process.env.IOL_ENABLE_TRADING !== 'true';
+
+    if (!isAdvisorMode && config.budget <= 0) {
+      console.log(`${LOG_PREFIX.OCTAVIO} Esperando asignación de presupuesto por parte del CEO...`);
+      return false; // Bypass cooldown, wait for funds
+    }
+
     const currentPnL = await MissionService.getOctavioPnL();
-    if (currentPnL >= config.target && config.target > 0) {
+    if (!isAdvisorMode && currentPnL >= config.target && config.target > 0) {
       if (config.autoResetPnL !== false) {
         console.log(`${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}✅ [Octavio] ¡SPRINT COMPLETADO (Alcancía Llena)! Meta de $${config.target} alcanzada (Total: $${currentPnL.toFixed(2)}). Reiniciando alcancía...${ANSI_COLORS.RESET}`);
         await MissionService.resetOctavioPnL();
@@ -40,19 +48,25 @@ export async function runOctavioIteration(): Promise<boolean> {
     const baseCoin = baseCoins[currentRotationIndex];
     currentRotationIndex++; // Increment for next iteration
     
+    // Multi-Venue Detection
+    const ALPACA_INDICES = ['SPX', 'VIX', 'XSP', 'DJX', 'SPXW', 'VIXW'];
+    const venue = isIol ? 'iol' : (ALPACA_INDICES.includes(baseCoin) ? 'alpaca' : 'bybit');
+
     // Obtener la cadena de opciones y posiciones en paralelo (I/O optimization)
     let optionsChain: any[] = [];
     let positions: any[] = [];
     try {
       [optionsChain, positions] = await Promise.all([
-        getOptionsChain('bybit', baseCoin),
-        getUnifiedPositions('bybit')
+        getOptionsChain(venue as 'alpaca' | 'bybit', baseCoin),
+        getUnifiedPositions(venue as 'alpaca' | 'bybit')
       ]);
     } catch (e: any) {
       console.warn(`[Octavio] Error de red: ${e.message}`);
       return true;
     }
-    const myOptionsPositions = positions.filter((p: Position) => p.symbol.includes('-') && p.qty > 0 && p.symbol.startsWith(baseCoin));
+    // Alpaca symbols don't have hyphens (e.g. SPXW240119C04500000), Bybit has hyphens (e.g. BTC-29SEP-...).
+    // For Alpaca, options have numbers indicating date/strike. 
+    const myOptionsPositions = positions.filter((p: Position) => p.qty > 0 && p.symbol.startsWith(baseCoin) && (p.symbol.includes('-') || /\d/.test(p.symbol)));
 
     const now = Date.now();
     if (myOptionsPositions.length > 0) {
@@ -76,7 +90,7 @@ export async function runOctavioIteration(): Promise<boolean> {
            console.log(`${ANSI_COLORS.RED}💀 [OCTAVIO HARD STOP LOSS] Theta Decay / Drawdown extremo (${pnlPctStr}%). ¡Liquidando ${p.symbol} por Damage Control!${ANSI_COLORS.RESET}`);
            console.log(`======================================================\n`);
            
-           await executeOrder('bybit', {
+           await executeOrder(venue as 'alpaca' | 'bybit', {
              symbol: p.symbol,
              side: p.side === 'buy' ? 'sell' : 'buy',
              qty: p.qty,
@@ -90,7 +104,7 @@ export async function runOctavioIteration(): Promise<boolean> {
            await MissionService.addLifetimeOctavioPnL(realizedPnl);
            
            await prisma.executionLog.create({
-              data: { eventType: 'OPTION_TRADE_CLOSED', venue: 'bybit', symbol: p.symbol, success: true, details: JSON.stringify({ reason: 'HARD_STOP_LOSS', pnlPct, realizedPnl }) }
+              data: { eventType: 'OPTION_TRADE_CLOSED', venue, symbol: p.symbol, success: true, details: JSON.stringify({ reason: 'HARD_STOP_LOSS', pnlPct, realizedPnl }) }
            });
            forcedClose = true;
         }
@@ -98,9 +112,13 @@ export async function runOctavioIteration(): Promise<boolean> {
       
       if (forcedClose) return false; // Bypass cooldown if forced close occurred
 
-      const targetPct = (config.target / config.budget) * 100;
-      const currentPct = (currentPnL / config.budget) * 100;
-      console.log(`${ANSI_COLORS.CYAN}  [Resumen] Presupuesto: $${config.budget.toFixed(2)} | Alcancía: $${currentPnL.toFixed(2)} (${currentPct.toFixed(2)}%) | Target: $${config.target.toFixed(2)} (Tier ~${targetPct.toFixed(0)}%)${ANSI_COLORS.RESET}`);
+      if (isAdvisorMode) {
+        console.log(`${ANSI_COLORS.CYAN}  [Resumen] Modo Asesor Activo (Modo Lectura)${ANSI_COLORS.RESET}`);
+      } else {
+        const targetPct = (config.target / config.budget) * 100;
+        const currentPct = (currentPnL / config.budget) * 100;
+        console.log(`${ANSI_COLORS.CYAN}  [Resumen] Presupuesto: $${config.budget.toFixed(2)} | Alcancía: $${currentPnL.toFixed(2)} (${currentPct.toFixed(2)}%) | Target: $${config.target.toFixed(2)} (Tier ~${targetPct.toFixed(0)}%)${ANSI_COLORS.RESET}`);
+      }
     } // Cierra if (myOptionsPositions.length > 0)
 
     // Filtrar contratos inválidos/expirados y ordenar por liquidez
@@ -137,17 +155,27 @@ export async function runOctavioIteration(): Promise<boolean> {
       theta: opt.theta
     }));
 
-    const systemPrompt = `Eres Octavio, un Trader Especialista en Opciones Crypto.
-Operas en Bybit (categoría option). Presupuesto asignado: $${config.budget}.
+    const budgetText = isAdvisorMode ? ` Estás operando como Asesor (Modo Lectura).` : ` Presupuesto asignado: $${config.budget}.`;
+    let systemPrompt = `Eres Octavio, un Trader Especialista en Opciones Crypto y Tradicionales.
+Operas en ${venue.toUpperCase()} (categoría option).${budgetText}
 Tu activo base es: ${baseCoin}.
 Posiciones Abiertas: ${JSON.stringify(myOptionsPositions)}
 Cadena de Opciones (Muestra parcial): ${JSON.stringify(filteredChain)}${directiveText}
 
 Reglas Críticas:
-1. Comprar opciones (Long Call / Long Put) requiere pagar la Prima (Premium). Theta decay comerá tu valor cada día.
-2. Si ves alta Volatilidad Implícita (IV) injustificada, considera no comprar.
-3. Si el PnL de una opción abierta supera tu target esperado o el Theta te está destruyendo, cierra la posición (CLOSE_OPTION).
-4. No envíes texto, solo usa la tool 'options_action'.`;
+1. TU OBJETIVO ÚNICO es generar ganancias especulando con la variación de precios de los contratos y las primas.
+2. PILARES DE ANÁLISIS: TENDENCIA, LIQUIDEZ, VOLATILIDAD IMPLÍCITA (IV), VENCIMIENTO.`;
+
+    if (isAdvisorMode) {
+      systemPrompt += `\n\nATENCIÓN: EL SISTEMA ESTÁ EN MODO READ-ONLY (SEGURIDAD MÁXIMA). ERES UN ASESOR/AUDITOR, NO UN TRADER.
+TIENES PROHIBIDO EJECUTAR ÓRDENES. TU ÚNICO OBJETIVO ES ANALIZAR LA CADENA DE OPCIONES Y AVISAR AL USUARIO SI HAY UNA OPORTUNIDAD.
+NO USES HERRAMIENTAS DE TRADING. TERMINA TU REPORTE CON [TÍTULO: Resumen de Opciones].`;
+    } else {
+      systemPrompt += `\n3. ESTRATEGIAS PERMITIDAS: Long Call / Long Put / Bull Call Spread / Bear Put Spread.
+4. ESTRATEGIAS PROHIBIDAS (Riesgo Infinito): NUNCA vendas opciones desnudas (Short Call/Put).
+5. Si el PnL supera tu target, cierra la posición (CLOSE_OPTION).
+6. No envíes texto, solo usa la tool 'options_action'.`;
+    }
 
     const optionsTool: ChatCompletionTool = {
       type: 'function',
@@ -200,7 +228,7 @@ Reglas Críticas:
           let instrumentInfo;
           try {
             const m = await import('@/features/venues/venue.service');
-            instrumentInfo = await m.getInstrumentInfo('bybit', args.symbol);
+            instrumentInfo = await m.getInstrumentInfo(venue as 'alpaca' | 'bybit', args.symbol);
           } catch (validationErr: any) {
             console.log(`${ANSI_COLORS.YELLOW}⚠️ [Octavio] Contrato inválido o expirado en el Broker: ${validationErr.message}. Abortando orden.${ANSI_COLORS.RESET}`);
             return false; // Skip wait to rotate immediately
@@ -212,7 +240,7 @@ Reglas Críticas:
             console.log(`${ANSI_COLORS.PINK}[OCTAVIO ATAQUE]${ANSI_COLORS.RESET} 🎯 ¡Entrando a ${args.symbol} (${args.side})!`);
             console.log(`======================================================\n`);
             
-            await executeOrder('bybit', {
+            await executeOrder(venue as 'alpaca' | 'bybit', {
               symbol: args.symbol,
               side: args.side,
               qty: minQty, // Dinámico según las reglas de la moneda
@@ -221,7 +249,7 @@ Reglas Críticas:
             });
             
             await prisma.executionLog.create({
-              data: { eventType: 'OPTION_TRADE_OPENED', venue: 'bybit', symbol: args.symbol, success: true, details: JSON.stringify({ side: args.side, reason: args.reason, qty: minQty }) }
+              data: { eventType: 'OPTION_TRADE_OPENED', venue, symbol: args.symbol, success: true, details: JSON.stringify({ side: args.side, reason: args.reason, qty: minQty }) }
             });
           } else if (args.action === 'CLOSE_OPTION') {
              const posToClose = myOptionsPositions.find(p => p.symbol === args.symbol);
@@ -230,12 +258,12 @@ Reglas Críticas:
                console.log(`${ANSI_COLORS.GREEN}[OCTAVIO CERRANDO POSICIÓN]${ANSI_COLORS.RESET} 💰 Ejecutando Take Profit / Cierre estratégico en ${args.symbol}!`);
                console.log(`======================================================\n`);
                
-               await executeOrder('bybit', {
+               await executeOrder(venue as 'alpaca' | 'bybit', {
+                 category: 'option',
                  symbol: args.symbol,
-                 side: posToClose.side === 'buy' ? 'sell' : 'buy', // En opciones bybit, cerrar una posición es enviar orden contraria con reduceOnly
+                 side: posToClose.side === 'buy' ? 'sell' : 'buy', // En opciones, cerrar una posición es enviar orden contraria (reduceOnly para Bybit)
                  qty: posToClose.qty,
                  type: 'market',
-                 category: 'option',
                  reduceOnly: true
                });
                
@@ -244,7 +272,7 @@ Reglas Críticas:
                await MissionService.addLifetimeOctavioPnL(realizedPnl);
                
                await prisma.executionLog.create({
-                  data: { eventType: 'OPTION_TRADE_CLOSED', venue: 'bybit', symbol: args.symbol, success: true, details: JSON.stringify({ reason: args.reason, realizedPnl }) }
+                  data: { eventType: 'OPTION_TRADE_CLOSED', venue, symbol: args.symbol, success: true, details: JSON.stringify({ reason: args.reason, realizedPnl }) }
                });
              }
           }

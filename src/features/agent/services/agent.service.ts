@@ -154,15 +154,21 @@ export async function runAgentCycle(userMessage?: string, marketContext?: string
           const parsed = typeof result === 'string' && result.startsWith('{') ? JSON.parse(result) : result;
 
           if (toolCall.function.name === 'get_account_state') {
-            const bybitCash = parsed?.consolidatedBalance?.bybit?.cash ? parsed.consolidatedBalance.bybit.cash.toFixed(2) : '0';
-            const bybitSpot = parsed?.consolidatedBalance?.bybit?.spotPower ? parsed.consolidatedBalance.bybit.spotPower.toFixed(2) : '0';
-            const bybitPower = parsed?.consolidatedBalance?.bybit?.dayTradingPower ? parsed.consolidatedBalance.bybit.dayTradingPower.toFixed(2) : '0';
-            const alpacaCash = parsed?.consolidatedBalance?.alpaca?.cash ? parsed.consolidatedBalance.alpaca.cash.toFixed(2) : '0';
-            const positions = (parsed?.positions?.alpaca?.length || 0) + (parsed?.positions?.bybit?.length || 0);
-            displayResult = `\n` +
-              `${ANSI_COLORS.GRAY}  ├─ Bybit  : Cash ${ANSI_COLORS.GREEN}$${bybitCash}${ANSI_COLORS.GRAY} (Spot: ${ANSI_COLORS.GREEN}$${bybitSpot}${ANSI_COLORS.GRAY} | Futuros: ${ANSI_COLORS.GREEN}$${bybitPower}${ANSI_COLORS.GRAY})${ANSI_COLORS.RESET}\n` +
-              `${ANSI_COLORS.GRAY}  ├─ Alpaca : Cash ${ANSI_COLORS.GREEN}$${alpacaCash}${ANSI_COLORS.RESET}\n` +
-              `${ANSI_COLORS.GRAY}  └─ Posiciones Totales: ${ANSI_COLORS.YELLOW}${positions}${ANSI_COLORS.RESET}`;
+            const formatCash = (b: any) => b ? `$${b.cash.toFixed(2)}` : 'N/A';
+            const totalPositions = (parsed?.positions?.alpaca?.length || 0) + (parsed?.positions?.bybit?.length || 0) + (parsed?.positions?.iol?.length || 0);
+            let resultMsg = '\n';
+            
+            if (process.env.CEO_MODE === 'iol') {
+              resultMsg += `${ANSI_COLORS.GRAY}  ├─ IOL    : Cash ${ANSI_COLORS.GREEN}${formatCash(parsed?.consolidatedBalance?.iol)}${ANSI_COLORS.RESET}\n`;
+            } else if (process.env.CEO_MODE === 'crypto') {
+              resultMsg += `${ANSI_COLORS.GRAY}  ├─ Bybit  : Cash ${ANSI_COLORS.GREEN}${formatCash(parsed?.consolidatedBalance?.bybit)}${ANSI_COLORS.GRAY} (Spot: ${ANSI_COLORS.GREEN}$${parsed?.consolidatedBalance?.bybit?.spotPower?.toFixed(2) || '0'}${ANSI_COLORS.GRAY} | Futuros: ${ANSI_COLORS.GREEN}$${parsed?.consolidatedBalance?.bybit?.dayTradingPower?.toFixed(2) || '0'})${ANSI_COLORS.RESET}\n`;
+            } else {
+              resultMsg += `${ANSI_COLORS.GRAY}  ├─ Bybit  : Cash ${ANSI_COLORS.GREEN}${formatCash(parsed?.consolidatedBalance?.bybit)}${ANSI_COLORS.GRAY} (Spot: ${ANSI_COLORS.GREEN}$${parsed?.consolidatedBalance?.bybit?.spotPower?.toFixed(2) || '0'}${ANSI_COLORS.GRAY} | Futuros: ${ANSI_COLORS.GREEN}$${parsed?.consolidatedBalance?.bybit?.dayTradingPower?.toFixed(2) || '0'})${ANSI_COLORS.RESET}\n`;
+              resultMsg += `${ANSI_COLORS.GRAY}  ├─ Alpaca : Cash ${ANSI_COLORS.GREEN}${formatCash(parsed?.consolidatedBalance?.alpaca)}${ANSI_COLORS.RESET}\n`;
+              resultMsg += `${ANSI_COLORS.GRAY}  ├─ IOL    : Cash ${ANSI_COLORS.GREEN}${formatCash(parsed?.consolidatedBalance?.iol)}${ANSI_COLORS.RESET}\n`;
+            }
+            resultMsg += `${ANSI_COLORS.GRAY}  └─ Posiciones Totales: ${ANSI_COLORS.YELLOW}${totalPositions}${ANSI_COLORS.RESET}`;
+            displayResult = resultMsg;
           } else if (toolCall.function.name === 'execute_trade') {
             if (parsed?.error) {
               displayResult = `❌ Error: ${parsed.error}`;

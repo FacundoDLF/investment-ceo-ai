@@ -1,12 +1,14 @@
 import { AlpacaAdapter } from './alpaca.adapter';
 import { BybitAdapter } from './bybit.adapter';
+import { IolAdapter } from './iol.adapter';
 import type { IVenueAdapter, BalanceBreakdown, OrderParams, Position } from '../../shared/interfaces/venue.adapter';
 
-export type VenueName = 'alpaca' | 'bybit';
+export type VenueName = 'alpaca' | 'bybit' | 'iol';
 
-const venueRegistry: Record<VenueName, IVenueAdapter> = {
+export const venueRegistry: Record<VenueName, IVenueAdapter> = {
   alpaca: new AlpacaAdapter(),
   bybit: new BybitAdapter(),
+  iol: new IolAdapter()
 };
 
 export async function getUnifiedBalance(venueName: VenueName): Promise<BalanceBreakdown> {

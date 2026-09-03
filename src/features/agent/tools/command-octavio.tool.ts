@@ -19,7 +19,7 @@ export const commandOctavioTool: ChatCompletionTool = {
   type: 'function',
   function: {
     name: 'command_octavio',
-    description: 'Envía órdenes al Sub-Agente Octavio (Especialista en Opciones Crypto). Úsalo para encenderlo, apagarlo, o cambiar su activo base (ej. BTC).',
+    description: 'Envía órdenes al Sub-Agente Octavio (Especialista en Opciones). Úsalo para encenderlo, apagarlo, o cambiar su activo base (ej. BTC, ETH, SPX, VIX).',
     parameters: {
       type: 'object',
       properties: {
@@ -55,6 +55,11 @@ export async function executeCommandOctavio(args: string): Promise<any> {
     let budget: number | undefined = undefined;
     let target: number | undefined = undefined;
 
+    // Detección de venue para cálculo de límite de margen
+    const currentAsset = asset || StateService.getOctavioState().targetAsset || '';
+    const isAlpaca = ['SPX', 'VIX', 'XSP', 'DJX', 'SPXW', 'VIXW'].some(idx => currentAsset.includes(idx));
+    const venueName = isAlpaca ? 'alpaca' : 'bybit';
+
     if (baseCapital !== undefined && baseCapital > 0) {
       const bMult = budgetMultiplier !== undefined ? budgetMultiplier : 0.4;
       const tMult = targetMultiplier !== undefined ? targetMultiplier : 0.1;
@@ -62,10 +67,10 @@ export async function executeCommandOctavio(args: string): Promise<any> {
       budget = baseCapital * bMult;
       
       try {
-        const bybitBal = await getUnifiedBalance('bybit');
-        const maxBudget = bybitBal.dayTradingPower * 0.9;
+        const bal = await getUnifiedBalance(venueName);
+        const maxBudget = bal.dayTradingPower * 0.9;
         if (budget > maxBudget && maxBudget > 0) {
-          console.log(`[Octavio Safety] Budget auto-calculado de $${budget.toFixed(2)} excede el límite seguro. Topando a $${maxBudget.toFixed(2)}.`);
+          console.log(`[Octavio Safety] Budget auto-calculado de $${budget.toFixed(2)} excede el límite seguro en ${venueName}. Topando a $${maxBudget.toFixed(2)}.`);
           budget = maxBudget;
         }
       } catch (e) {

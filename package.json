@@ -11,9 +11,11 @@
     "ceo:crypto": "npx tsx --env-file=.env src/processes/daemon/ceo.loop.ts crypto --watch",
     "ceo:scrappy": "npx tsx --env-file=.env src/processes/daemon/scrappy-standalone.ts --watch",
     "ceo:octavio": "npx tsx --env-file=.env src/processes/daemon/octavio-standalone.ts --watch",
+    "ceo:iol": "npx tsx --env-file=.env src/processes/daemon/iol.loop.ts --watch",
     "chat": "npx tsx --env-file=.env src/processes/scripts/chat-ceo.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "googlethis": "^1.8.0",

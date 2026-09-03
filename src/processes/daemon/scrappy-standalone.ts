@@ -4,6 +4,16 @@ import { getUnifiedBalance } from '@/features/venues/venue.service';
 import { runScrappyIteration } from '@/features/agent/sub-agents/scrappy.agent';
 import { ANSI_COLORS } from '@/shared/constants/colors';
 
+const DAEMON_START_TIME = Date.now();
+function formatUptime(): string {
+  const diff = Math.floor((Date.now() - DAEMON_START_TIME) / 1000);
+  const d = Math.floor(diff / (3600 * 24));
+  const h = Math.floor((diff % (3600 * 24)) / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
+
 // Configuración inicial base
 StateService.setScrappyConfig(true, 'BTCUSDT', 0, 0, false);
 
@@ -66,7 +76,7 @@ async function startDynamicStandalone() {
   let iter = 1;
   while (true) {
     try {
-      console.log(`\n${ANSI_COLORS.GRAY}[${new Date().toLocaleTimeString()}] [Scrappy] Iteración #${iter}...${ANSI_COLORS.RESET}`);
+      console.log(`\n${ANSI_COLORS.GRAY}[${new Date().toLocaleTimeString()}] [Scrappy] Iteración #${iter} | Running: ${formatUptime()}...${ANSI_COLORS.RESET}`);
       await runScrappyIteration();
       iter++;
       

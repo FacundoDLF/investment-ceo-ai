@@ -16,6 +16,17 @@ import { startScrappyDaemon } from './scrappy.loop';
 import { startOctavioDaemon } from './octavio.loop';
 import { ModelRouter } from '@/shared/constants/models';
 
+process.env.CEO_MODE = 'normal'; // O 'crypto', inyectado abajo
+const DAEMON_START_TIME = Date.now();
+function formatUptime(): string {
+  const diff = Math.floor((Date.now() - DAEMON_START_TIME) / 1000);
+  const d = Math.floor(diff / (3600 * 24));
+  const h = Math.floor((diff % (3600 * 24)) / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
+
 let cachedMarketStatus = { bymaOpen: false, wsPreMarket: false, wsOpen: false, wsAfterHours: false };
 let lastMarketStatusCheck = 0;
 
@@ -73,7 +84,7 @@ const frozenVenues: Set<VenueName> = new Set();
 async function runDaemonIteration(mode?: string) {
   iterationCount++;
   const timestamp = DateTime.now().setZone('America/Argentina/Buenos_Aires').toFormat('dd/MM/yyyy HH:mm:ss');
-  console.log(`\n${LOG_PREFIX.SISTEMA} [${timestamp}] Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'})...`);
+  console.log(`\n${LOG_PREFIX.SISTEMA} [${timestamp}] Iniciando iteración #${iterationCount} del CEO Trader (Modo: ${mode || 'Normal'}) | Running: ${formatUptime()}...`);
 
   try {
     for (const v of [VENUES.ALPACA, VENUES.BYBIT]) {
@@ -94,7 +105,10 @@ async function runDaemonIteration(mode?: string) {
       console.log(`${ANSI_COLORS.CYAN}Desafío Octavio: Meta $${octavioState.target} | PnL Actual: $${currentOctavioPnL.toFixed(2)}${ANSI_COLORS.RESET}`);
     }
 
-    const activeVenues: VenueName[] = mode === TRADING_MODES.CRYPTO ? [VENUES.BYBIT] : [VENUES.ALPACA, VENUES.BYBIT];
+    let activeVenues: VenueName[] = [VENUES.ALPACA, VENUES.BYBIT];
+    if (mode === TRADING_MODES.CRYPTO) {
+      activeVenues = [VENUES.BYBIT];
+    }
 
     // Ejecutar Sub-Agentes Independientes de Forma Concurrente (Optimización 1.2)
     const now = Date.now();
@@ -537,8 +551,9 @@ ${ANSI_COLORS.MAGENTA}   ___  _   _ _  __   __   ____ ______   ______ _____ ___
   \\___/|_| \\_|_____|_|    \\____|_| \\_\\|_| |_|    |_| \\___/ 
   \x1b[0m`;
 
-  const modeTitle = mode === 'crypto' 
-    ? `${asciiCrypto}\n` +
+  let modeTitle = "";
+  if (mode === 'crypto') {
+    modeTitle = `${asciiCrypto}\n` +
       `  Investment CEO AI (Modo: CRYPTO DEGEN) \n\n` +
       `────────────────────────────────────────────────────────────────────────\n` +
       `  CONFIGURACIÓN DE MODO CRYPTO\n` +
@@ -547,11 +562,15 @@ ${ANSI_COLORS.MAGENTA}   ___  _   _ _  __   __   ____ ______   ______ _____ ___
       `  Mercado Crypto (Bybit)       : 🟢 24/7 ABIERTO\n` +
       `  Escáner Activo               : Markus Skinner (cada 15m)\n` +
       `  Frecuencia                   : Aceleración dinámica activada\n` +
-      `────────────────────────────────────────────────────────────────────────\n`
-    : `${asciiBrain}\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: Normal) ${ANSI_COLORS.RESET}\n`;
+      `────────────────────────────────────────────────────────────────────────\n`;
+  } else {
+    modeTitle = `${asciiBrain}\n${ANSI_COLORS.GREEN}${ANSI_COLORS.BOLD}  Investment CEO AI (Modo: Normal) ${ANSI_COLORS.RESET}\n`;
+  }
 
   const finalAscii = modeTitle;
   console.log(finalAscii);
+
+
   ModelRouter.printRegistryTable();
 
   while (true) {
@@ -601,7 +620,11 @@ ${ANSI_COLORS.MAGENTA}   ___  _   _ _  __   __   ____ ______   ______ _____ ___
 }
 
 if (require.main === module) {
-  const modeArg = process.argv.includes(TRADING_MODES.CRYPTO) ? TRADING_MODES.CRYPTO : undefined;
+  let modeArg: string | undefined;
+  if (process.argv.includes(TRADING_MODES.CRYPTO)) {
+    modeArg = TRADING_MODES.CRYPTO;
+    process.env.CEO_MODE = 'crypto';
+  }
 
   // Scrappy se inicia en todos los modos (tanto regular como crypto)
   startScrappyDaemon().catch(console.error);

@@ -45,6 +45,11 @@ export interface Position {
  */
 export interface IVenueAdapter {
   /**
+   * El protocolo subyacente que utiliza el adaptador (ej. REST, WebSocket, FIX).
+   */
+  readonly protocol?: string;
+
+  /**
    * Obtiene las capacidades del broker.
    * @returns Una lista de capacidades (ej. ['CASH_OUT', 'TRADE_STOCKS', 'TRADE_CRYPTO']).
    */

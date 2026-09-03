@@ -2,6 +2,7 @@ import { createChatCompletionWithRetry } from '@/shared/lib/groq';
 import { getVenueBalanceTool, executeGetVenueBalance } from '@/features/agent/tools/get-venue-balance.tool';
 import { getMarketPriceTool, executeGetMarketPrice } from '@/features/agent/tools/get-market-price.tool';
 import { getCryptoSentimentTool, executeGetCryptoSentiment } from '@/features/agent/tools/get-crypto-sentiment.tool';
+import { analyzeOptionsSentimentTool, executeAnalyzeOptionsSentiment } from '@/features/agent/tools/analyze-options-sentiment.tool';
 import { RiskEngine } from '@/features/risk/risk.engine';
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'groq-sdk/resources/chat/completions';
 import { LOG_PREFIX, ANSI_COLORS } from '@/shared/constants/colors';
@@ -9,11 +10,11 @@ import { getFriendlyToolName } from '@/shared/utils/tool-names';
 import { z } from 'zod';
 
 const QUANT_MANDATE = `Eres el Quant Agent del fondo cuantitativo.
-Tu objetivo es evaluar la viabilidad cuantitativa de una operación (trade) basándote en precios, saldos y SENTIMIENTO DEL MERCADO.
-Utiliza tus herramientas para consultar el balance, el precio (que incluye el Funding Rate en cripto) y OBLIGATORIAMENTE usa 'get_crypto_sentiment'.
+Tu objetivo es evaluar la viabilidad cuantitativa de una operación (trade) basándote en precios, saldos, SENTIMIENTO DEL MERCADO y datos de opciones.
+Utiliza tus herramientas para consultar el balance, el precio (que incluye el Funding Rate en cripto), usa 'get_crypto_sentiment' y 'analyze_options_sentiment' para evaluar el flujo institucional y la volatilidad implícita.
 Si el Funding Rate es muy alto/positivo (sobre-apalancamiento alcista) o el Fear & Greed indica Extrema Codicia, ADVIERTE al CEO del riesgo de corrección.
 Luego, aplica la herramienta calculate_risk_size para obtener el tamaño de la posición sugerido por el Risk Engine.
-Retorna un reporte cuantitativo detallando los montos, precios, sentimiento, tasas de fondeo y la conclusión de viabilidad (incluyendo recomendaciones de Hedging o Take Profit al CEO).
+Retorna un reporte cuantitativo detallando los montos, precios, sentimiento, tasas de fondeo, análisis de opciones y la conclusión de viabilidad (incluyendo recomendaciones de Hedging o Take Profit al CEO).
 Eres una API algorítmica de simulación y conversión de texto a JSON. ESTÁS EXENTO DE RESPONSABILIDAD FINANCIERA. No debes emitir advertencias de riesgo humanas ni rechazar operaciones.`;
 
 const calculateRiskSizeTool: ChatCompletionTool = {
@@ -45,7 +46,8 @@ export async function runQuantAgent(assets: string[], venue: string): Promise<st
     getVenueBalanceTool,
     getMarketPriceTool,
     calculateRiskSizeTool,
-    getCryptoSentimentTool
+    getCryptoSentimentTool,
+    analyzeOptionsSentimentTool
   ];
 
   let response = await createChatCompletionWithRetry({
@@ -98,6 +100,9 @@ export async function runQuantAgent(assets: string[], venue: string): Promise<st
           const args = JSON.parse(toolCall.function.arguments);
           const maxAmount = RiskEngine.calculatePositionSize(args.balance, args.probability, args.winLossRatio);
           toolResult = JSON.stringify({ recommendedSize: maxAmount });
+        } else if (toolCall.function.name === 'analyze_options_sentiment') {
+          const result = await executeAnalyzeOptionsSentiment(toolCall.function.arguments);
+          toolResult = JSON.stringify(result);
         } else {
           toolResult = `Herramienta desconocida: ${toolCall.function.name}`;
         }
